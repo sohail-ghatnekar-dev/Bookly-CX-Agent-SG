@@ -1,0 +1,24 @@
+.DS_Store
+
+# Secrets
+.env
+.env.*
+!*.example
+!.env.example
+supabase/.env
+supabase/.env.hosted
+evals/.env
+ios/Bookly/Config.xcconfig
+
+# Supabase CLI state
+supabase/.temp/
+supabase/.branches/
+
+# Eval output
+evals/results/*
+!evals/results/.gitkeep
+
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
