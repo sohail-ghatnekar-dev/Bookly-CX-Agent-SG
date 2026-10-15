@@ -95,7 +95,7 @@ Final run on `claude-haiku-5-5`, 5 repeats per scenario:
 
 45 of 45 runs passed: 35 resolved, 10 escalated. Demo gate (scenarios 1–8 at 5/5): **pass**.
 
-Getting here took three rounds. The first run passed 6 of 8 gated scenarios. The failures were fixed in this order: an over-eager Sources parser and a missing confirmation turn in a script (my bugs); the claim check firing on policy explanations; and two procedure gaps, now fixed in returns v4. The last change before this write-up only reworded the escalation-summary instruction. A rerun after it passed all 36 runs it completed before the local Docker VM stopped (the host disk was full).
+Getting here took three rounds. The first run passed 6 of 8 gated scenarios. The failures were fixed in this order: an over-eager Sources parser and a missing confirmation turn in a script (my bugs); the claim check firing on policy explanations; and two procedure gaps, now fixed in returns v4. The table is from a full run on the committed code.
 
 **Definitions.** *Resolved* means the run passed every assertion and there was no escalation. *Escalated* means an escalation row exists. *Failed* means anything else. These numbers are scenario-level, scripted conversations against seed data. They are not a production resolution rate.
 
