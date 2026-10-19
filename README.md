@@ -66,7 +66,7 @@ Tap **Trace** in the top right first. It shows a short line under each reply for
 
 **A return that's allowed.** Start a new chat from the menu. Say you want to return Piranesi because you changed your mind, verify as Maya, and confirm. You get an RMA number back, and a return row is created in the database.
 
-**A return that isn't.** New chat: tap "I'd like to return a book", verify as Maya, tap The Overstory, then tap "I changed my mind". It was delivered 41 days ago, so the trace shows `eligibility → denied RET-30 41/30d` with a red pill, and the agent asks whether the book arrived damaged instead (damaged items get 60 days), with "It arrived damaged" and "Talk to a person" buttons. Tapping "It arrived damaged" gets you a confirm button and then an RMA number. To see a handoff instead, type something like "just do it anyway". The agent doesn't argue. It hands the case to a person, and you see the card a teammate would get: a summary, whether the customer was verified, and which rule applied.
+**A return that isn't.** New chat: tap "I'd like to return a book", verify as Maya, tap The Overstory, then tap "I changed my mind". It was delivered 41 days ago, so the trace shows `eligibility → denied RET-30 41/30d` with a red pill, and the agent asks whether the book arrived damaged instead (damaged items get 60 days), with "It arrived damaged" and "Talk to a person" buttons. Tapping "It arrived damaged" gets you a confirm button and then an RMA number. To see a handoff instead, type something like "just do it anyway". The agent doesn't argue. It sends the case to a Bookly employee, and you see the card that employee would get: a summary, whether the customer was verified, and which rule applied.
 
 ![Handoff card](docs/screenshots/handoff.png)
 
@@ -174,7 +174,7 @@ Putting the app on TestFlight is in [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md).
 - **One return per item.** A second attempt is refused with `RET-DUPLICATE`. That's a code rule, not one of the policy documents.
 - **The claim check ignores rule statements.** "Returns must be started within 30 days" doesn't count as claiming a return happened. "Your return has been started" without an RMA does.
 - **Returns v4 and the tool tweaks came from eval failures.** Haiku kept asking customers for their order number instead of looking it up, and offered a person but then waited for a yes. Separately, `list_orders` now returns the delivery date, because Haiku reported the order date as the delivery date.
-- **Chats cap at 20 messages.** After a handoff, new messages just get a "a teammate has your case" reply.
+- **Chats cap at 20 messages.** After a handoff, new messages just get an "a Bookly employee has your case" reply.
 - **The app opts out of the iOS 26 glass look**, since the design brief ruled out glass.
 
 ## What I'd do differently

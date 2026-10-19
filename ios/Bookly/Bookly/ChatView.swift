@@ -71,7 +71,7 @@ struct ChatView: View {
     private var inputBar: some View {
         HStack(alignment: .bottom, spacing: 10) {
             TextField(
-                model.isEscalated ? "A teammate has your case" : "Write a message",
+                model.isEscalated ? "A Bookly employee has your case" : "Write a message",
                 text: $draft,
                 axis: .vertical
             )

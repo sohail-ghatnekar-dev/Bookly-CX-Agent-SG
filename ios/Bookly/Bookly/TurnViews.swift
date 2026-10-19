@@ -94,10 +94,10 @@ struct HandoffCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Handed to a teammate")
+                Text("Sent to an employee")
                     .font(Theme.heading)
                     .foregroundStyle(Theme.ink)
-                Text("What your teammate sees")
+                Text("What the employee sees")
                     .font(Theme.caption)
                     .foregroundStyle(Theme.muted)
                 Text(escalation.summary)

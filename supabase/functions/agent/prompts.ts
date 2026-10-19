@@ -11,10 +11,10 @@ How you work:
 - If you can't help, or the customer insists on something the rules don't allow, offer a human and call escalate_to_human with a full summary.`;
 
 export const ESCALATED_REPLY =
-  "A teammate has your case and will reply within 1 business day. Start a new chat for anything else.";
+  "A Bookly employee has your case and will reply within 1 business day. Start a new chat for anything else.";
 export const FALLBACK_REPLY =
-  "Sorry, I couldn't finish that. Could you say it another way, or would you like a teammate to help?";
-export const REFUSAL_REPLY = "Sorry, I can't help with that here. Would you like a teammate to help?";
+  "Sorry, I couldn't finish that. Could you say it another way, or should I send this to a Bookly employee?";
+export const REFUSAL_REPLY = "Sorry, I can't help with that here. Should I send this to a Bookly employee?";
 
 export interface ProcedureRef {
   name: string;

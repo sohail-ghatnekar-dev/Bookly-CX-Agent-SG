@@ -67,7 +67,7 @@ export const TOOL_DEFS: Tool[] = [
   {
     name: "escalate_to_human",
     description:
-      "Hand the conversation to a human teammate. When the customer pushes back on a denial or insists on something the rules don't allow, call it in the same reply where you offer a human; don't wait for them to accept.",
+      "Send the conversation to a Bookly employee. When the customer pushes back on a denial or insists on something the rules don't allow, call it in the same reply where you offer to send it to an employee; don't wait for them to accept.",
     input_schema: obj({
       reason: str("Short reason for the handoff"),
       summary: str(

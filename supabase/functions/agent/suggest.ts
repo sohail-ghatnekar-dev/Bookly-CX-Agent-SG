@@ -21,8 +21,8 @@ export const DAMAGED = "It arrived damaged";
 export const CHANGED_MIND = "I changed my mind";
 export const CONFIRM = "Yes, start the return";
 export const DECLINE = "No, thanks";
-export const HUMAN = "Talk to a person";
-export const ACCEPT_PERSON = "Yes, connect me";
+export const HUMAN = "Send to an employee";
+export const ACCEPT_PERSON = "Yes, send it to an employee";
 
 export function suggestReplies(s: SuggestionInput): string[] {
   // A handed-off case takes no more input, and buttons only answer a question.
@@ -32,12 +32,12 @@ export function suggestReplies(s: SuggestionInput): string[] {
   return offersPerson(s.reply) ? [ACCEPT_PERSON, DECLINE] : [];
 }
 
-// "Would you like me to connect you with a teammate?" and the like.
+// "Should I send this to a Bookly employee?" and the like.
 function offersPerson(reply: string): boolean {
   return reply.split(/(?<=[.?!])\s+/).some((sentence) =>
     sentence.trim().endsWith("?") &&
-    /\b(person|teammate|human|someone on our team)\b/i.test(sentence) &&
-    /\b(would you like|shall i|should i|do you want|want me to)\b/i.test(sentence)
+    /\b(employee|person|teammate|human|someone on our team)\b/i.test(sentence) &&
+    /\b(would you like|shall i|should i|do you want|want me to|can i)\b/i.test(sentence)
   );
 }
 
