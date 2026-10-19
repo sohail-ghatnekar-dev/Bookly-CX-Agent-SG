@@ -16,7 +16,7 @@ struct ChatView: View {
                         emptyState
                     }
                     ForEach(model.turns) { turn in
-                        TurnView(turn: turn, showTrace: showTrace)
+                        TurnView(turn: turn, showTrace: showTrace, arriving: turn.id == model.arrivedTurnID)
                     }
                     if model.isSending {
                         TypingIndicator()
@@ -25,14 +25,17 @@ struct ChatView: View {
                         SuggestionRow(options: model.suggestions) { option in
                             Task { await model.send(option) }
                         }
+                        .padding(.leading, ChatLayout.agentIndent)
                     }
                     if let error = model.error {
                         ErrorRow(text: error, canRetry: model.canRetry) {
                             Task { await model.retry() }
                         }
+                        .padding(.leading, ChatLayout.agentIndent)
                     }
                     if model.isEscalated, let escalation = model.escalation {
                         HandoffCard(escalation: escalation) { model.newConversation() }
+                            .padding(.leading, ChatLayout.agentIndent)
                     }
                     Color.clear.frame(height: 1).id("bottom")
                 }
@@ -56,16 +59,22 @@ struct ChatView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("How can we help?")
-                .font(Theme.display)
-                .foregroundStyle(Theme.ink)
+            BookwormAvatar(size: 76)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("How can we help?")
+                    .font(Theme.display)
+                    .foregroundStyle(Theme.ink)
+                Text("I’m Bookly’s support bookworm. Ask about an order, a return, or our policies.")
+                    .font(Theme.prose)
+                    .foregroundStyle(Theme.muted)
+            }
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(starters, id: \.self) { starter in
                     Chip(text: starter) { Task { await model.send(starter) } }
                 }
             }
         }
-        .padding(.top, 96)
+        .padding(.top, 56)
     }
 
     private var inputBar: some View {
@@ -104,10 +113,13 @@ struct ChatView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .principal) {
-            VStack(spacing: 0) {
-                Text("Bookly").font(.system(.headline, design: .serif))
-                Text("Order support").font(.system(.caption, design: .serif)).italic()
-                    .foregroundStyle(Theme.muted)
+            HStack(spacing: 8) {
+                BookwormAvatar(size: 30)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Bookly").font(.system(.headline, design: .serif))
+                    Text("Support bookworm").font(.system(.caption, design: .serif)).italic()
+                        .foregroundStyle(Theme.muted)
+                }
             }
             .foregroundStyle(Theme.ink)
             .accessibilityElement(children: .combine)

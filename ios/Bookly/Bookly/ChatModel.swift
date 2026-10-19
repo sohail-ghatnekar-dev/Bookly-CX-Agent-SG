@@ -20,6 +20,8 @@ final class ChatModel {
     var escalation: Escalation?
     // Tap-to-answer options for the latest reply. Typing always works too.
     var suggestions: [String] = []
+    /// The reply that just came in, so its avatar can play the bookworm's return.
+    private(set) var arrivedTurnID: UUID?
     var isSending = false
     var error: String?
     private var failedMessage: String?
@@ -69,6 +71,7 @@ final class ChatModel {
         isEscalated = false
         escalation = nil
         suggestions = []
+        arrivedTurnID = nil
         error = nil
         failedMessage = nil
     }
@@ -83,6 +86,7 @@ final class ChatModel {
             let response = try await Backend.send(message, conversationId: conversationId)
             conversationId = response.conversationId
             if !turns.isEmpty {
+                arrivedTurnID = turns[turns.count - 1].id
                 turns[turns.count - 1].reply = response.reply
                 turns[turns.count - 1].trace = response.trace
                 turns[turns.count - 1].citations = response.citations

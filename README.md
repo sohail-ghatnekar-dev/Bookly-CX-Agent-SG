@@ -58,7 +58,7 @@ If you just want to talk to the agent without the app, the evals in the "Testing
 
 ## Things to try
 
-There's no login. You either tap one of the suggested goals on the first screen or type your own question. If the question is about your order, the agent asks for your email and ZIP, then looks you up. When it asks you something with a few obvious answers, like which order or why you're returning a book, buttons show up under the reply. You can tap one or just type. While it's thinking, a small bookworm in glasses and a bow tie pokes out of a book.
+There's no login. You either tap one of the suggested goals on the first screen or type your own question. If the question is about your order, the agent asks for your email and ZIP, then looks you up. When it asks you something with a few obvious answers, like which order or why you're returning a book, buttons show up under the reply. You can tap one or just type. Bookly's agent is a bookworm in round glasses and a red bow tie, and its picture sits next to every reply like a text thread. While it's working, a bubble says something like "Let me check the archives…", and the worm climbs out of its book, inches around that bubble, and dives back into the book when the answer arrives.
 
 Tap **Trace** in the top right first. It shows a short line under each reply for every tool call and policy check, so you can see what the agent actually did.
 
