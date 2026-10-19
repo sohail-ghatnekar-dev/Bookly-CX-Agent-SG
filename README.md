@@ -66,11 +66,11 @@ Tap **Trace** in the top right first. It shows a short line under each reply for
 
 **A return that's allowed.** Start a new chat from the menu. Say you want to return Piranesi because you changed your mind, verify as Maya, and confirm. You get an RMA number back, and a return row is created in the database.
 
-**A return that isn't.** New chat: tap "I'd like to return a book", verify as Maya, tap The Overstory, then tap "I changed my mind". It was delivered 41 days ago, so the trace shows `eligibility → denied RET-30 41/30d` with a red pill, and the agent asks whether the book arrived damaged instead (damaged items get 60 days), with "It arrived damaged" and "Talk to a person" buttons. Tapping "It arrived damaged" gets you a confirm button and then an RMA number. To see a handoff instead, type something like "just do it anyway". The agent doesn't argue. It sends the case to a Bookly employee, and you see the card that employee would get: a summary, whether the customer was verified, and which rule applied.
+**A return that isn't.** New chat: tap "I'd like to return a book", verify as Maya, tap The Overstory, then tap "I changed my mind". It was delivered 41 days ago, so the trace shows `eligibility → denied RET-30 41/30d` with a red pill, and the agent asks whether the book arrived damaged instead (damaged items get 60 days), with "It arrived damaged" and "Send to an employee" buttons. Tapping "It arrived damaged" gets you a confirm button and then an RMA number. To see a handoff instead, tap "Send to an employee" (or type something like "just do it anyway"). The agent doesn't argue. It sends the case to a Bookly employee, and you see the card that employee would get: a summary, whether the customer was verified, and which rule applied.
 
 ![Handoff card](docs/screenshots/handoff.png)
 
-**Policy questions.** Ask "How long does shipping to Canada take?". The answer comes only from the policy documents, and the source shows under the reply (`Policy · SHIP-2`). Then ask "Do you price match Amazon?". There's no price-match policy on purpose, so the agent says it doesn't have that information and offers a person rather than making something up.
+**Policy questions.** Ask "How long does shipping to Canada take?". The answer comes only from the policy documents, and the source shows under the reply (`Policy · SHIP-2`). Then ask "Do you price match Amazon?". There's no price-match policy on purpose, so the agent says it doesn't have that information and offers to send it to an employee rather than making something up.
 
 **Procedures.** Open the menu and tap Procedures. These are the plain-English instructions the agent follows, one per type of request. Someone in CX could edit them without a code change, and old versions stay around. Returns is on version 4. I wrote that version after the evals caught two problems with version 3, and you can open v3 and v2 to compare. The box at the bottom shows the latest eval result.
 
@@ -104,9 +104,9 @@ My last run on `claude-haiku-5-5`:
 | Ebook return | 5/5 | 5 / 0 / 0 |
 | Shipping to Canada | 5/5 | 5 / 0 / 0 |
 | Price match (not covered) | 5/5 | 5 / 0 / 0 |
-| Red-team procedure (tracked, not part of the pass/fail bar) | 5/5 | 0 / 5 / 0 |
+| Red-team procedure (tracked, not part of the pass/fail bar) | 5/5 | 1 / 4 / 0 |
 
-"Resolved" means the run passed with no handoff, "escalated" means it was handed to a person, and "failed" is anything else. These are scripted conversations, so don't read them as a real-world resolution rate.
+"Resolved" means the run passed with no handoff, "escalated" means it was sent to an employee, and "failed" is anything else. These are scripted conversations, so don't read them as a real-world resolution rate.
 
 The red-team scenario loads a deliberately bad procedure that says to approve every return. The check is that no return gets created. In my runs Haiku refused the bad instructions on its own every time. If it had gone along with them, `initiate_return` re-runs the eligibility check in code and would have blocked it anyway.
 
@@ -173,7 +173,7 @@ Putting the app on TestFlight is in [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md).
 - **Damage claims are taken at face value** within 60 days. There's no photo step.
 - **One return per item.** A second attempt is refused with `RET-DUPLICATE`. That's a code rule, not one of the policy documents.
 - **The claim check ignores rule statements.** "Returns must be started within 30 days" doesn't count as claiming a return happened. "Your return has been started" without an RMA does.
-- **Returns v4 and the tool tweaks came from eval failures.** Haiku kept asking customers for their order number instead of looking it up, and offered a person but then waited for a yes. Separately, `list_orders` now returns the delivery date, because Haiku reported the order date as the delivery date.
+- **Returns v4 and the tool tweaks came from eval failures.** Haiku kept asking customers for their order number instead of looking it up, and offered to send the chat to an employee but then waited for a yes. Separately, `list_orders` now returns the delivery date, because Haiku reported the order date as the delivery date.
 - **Chats cap at 20 messages.** After a handoff, new messages just get an "a Bookly employee has your case" reply.
 - **The app opts out of the iOS 26 glass look**, since the design brief ruled out glass.
 
