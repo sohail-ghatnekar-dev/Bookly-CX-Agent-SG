@@ -22,11 +22,27 @@ export const CHANGED_MIND = "I changed my mind";
 export const CONFIRM = "Yes, start the return";
 export const DECLINE = "No, thanks";
 export const HUMAN = "Talk to a person";
+export const ACCEPT_PERSON = "Yes, connect me";
 
 export function suggestReplies(s: SuggestionInput): string[] {
-  // Email and ZIP are typed, and a handed-off case takes no more input.
-  if (s.escalated || !s.verified || !s.reply.includes("?")) return [];
+  // A handed-off case takes no more input, and buttons only answer a question.
+  if (s.escalated || !s.reply.includes("?")) return [];
+  const options = s.verified ? forVerified(s) : [];
+  if (options.length) return options;
+  return offersPerson(s.reply) ? [ACCEPT_PERSON, DECLINE] : [];
+}
 
+// "Would you like me to connect you with a teammate?" and the like.
+function offersPerson(reply: string): boolean {
+  return reply.split(/(?<=[.?!])\s+/).some((sentence) =>
+    sentence.trim().endsWith("?") &&
+    /\b(person|teammate|human|someone on our team)\b/i.test(sentence) &&
+    /\b(would you like|shall i|should i|do you want|want me to)\b/i.test(sentence)
+  );
+}
+
+// Email and ZIP are typed, so everything else waits until the customer is verified.
+function forVerified(s: SuggestionInput): string[] {
   const check = s.events.findLast((e) => e.label === "eligibility");
   const started = check &&
     s.events.slice(s.events.indexOf(check)).some((e) => e.label === "initiate_return" && e.outcome === "ok");

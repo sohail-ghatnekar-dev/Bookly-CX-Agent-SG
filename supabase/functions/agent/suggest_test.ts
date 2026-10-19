@@ -69,6 +69,17 @@ Deno.test("after the return is created, no confirm buttons", () => {
   assertEquals(suggestReplies(input({ reply: "Anything else?", events: [orders, eligibility("ok", "RET-30"), started] })), []);
 });
 
+Deno.test("an offer of a person gets yes or no, verified or not", () => {
+  const reply = "It’s running late. Would you like me to connect you with a human teammate to look into it?";
+  assertEquals(suggestReplies(input({ reply, procedure: "order_status" })), ["Yes, connect me", "No, thanks"]);
+  assertEquals(suggestReplies(input({ reply: "I don’t have that information. Would you like to talk to a person?", verified: false, procedure: "policy_qa", events: [] })), ["Yes, connect me", "No, thanks"]);
+});
+
+Deno.test("mentioning a person outside the question is not an offer", () => {
+  const reply = "A teammate can help with that. Is there anything else I can help with?";
+  assertEquals(suggestReplies(input({ reply, verified: false, procedure: "policy_qa", events: [] })), []);
+});
+
 Deno.test("nothing before verification, after a handoff, or without a question", () => {
   const reply = "Did it arrive damaged, or did you change your mind?";
   assertEquals(suggestReplies(input({ reply, verified: false })), []);

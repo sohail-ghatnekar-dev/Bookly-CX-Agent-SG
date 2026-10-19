@@ -92,13 +92,21 @@ final class ChatModel {
             suggestions = response.suggestions ?? []
         } catch BackendError.conversationGone where !retryingAsNew {
             // The server no longer has this conversation: start a new one with the same message.
-            conversationId = nil
-            isSending = false
-            await deliver(message, retryingAsNew: true)
+            await startOver(with: message)
+        } catch BackendError.sessionExpired where !retryingAsNew {
+            // This device's anonymous session is gone. Customers never log in, so just get a new one.
+            try? await Backend.startFreshSession()
+            await startOver(with: message)
         } catch {
             failedMessage = message
             self.error = (error as? BackendError)?.errorDescription ?? Self.networkError
         }
+    }
+
+    private func startOver(with message: String) async {
+        conversationId = nil
+        isSending = false
+        await deliver(message, retryingAsNew: true)
     }
 
     // Live replies arrive with the Sources line already stripped; stored ones still carry it.

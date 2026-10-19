@@ -79,6 +79,7 @@ struct History {
 enum BackendError: LocalizedError {
     case message(String)
     case conversationGone
+    case sessionExpired
     var errorDescription: String? {
         if case .message(let text) = self { return text }
         return nil
@@ -112,6 +113,12 @@ enum Backend {
         }
     }
 
+    // The anonymous user behind the saved session no longer exists (expired or cleaned up).
+    static func startFreshSession() async throws {
+        try? await supabase.auth.signOut(scope: .local)
+        try await supabase.auth.signInAnonymously()
+    }
+
     static func send(_ message: String, conversationId: String?) async throws -> AgentReply {
         try await signInIfNeeded()
         do {
@@ -125,6 +132,8 @@ enum Backend {
             )
         } catch FunctionsError.httpError(let code, _) where code == 404 {
             throw BackendError.conversationGone
+        } catch FunctionsError.httpError(let code, _) where code == 401 {
+            throw BackendError.sessionExpired
         } catch FunctionsError.httpError(let code, let data) where code == 429 || code == 400 {
             // The function's own friendly errors (message limit, bad input) are shown as written.
             let body = try? JSONDecoder().decode([String: String].self, from: data)
