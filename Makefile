@@ -3,7 +3,7 @@
 # Secret patterns are written with a bracketed character so this file never matches itself.
 SECRET_PATTERNS := sk[-]ant-|sb[_]secret_|InNlcnZpY2Vfcm9[s]|ZXJ2aWNlX3JvbGU[i]|c2VydmljZV9yb2x[l]
 
-IGNORED := .env .env.local supabase/.env supabase/.env.hosted evals/.env \
+IGNORED := .env .env.local supabase/.env supabase/.env.hosted evals/.env evals/.env.remote \
 	ios/Bookly/Config.xcconfig supabase/.temp/x evals/results/latest.json
 NOT_IGNORED := supabase/.env.example evals/.env.example evals/results/.gitkeep \
 	ios/Bookly/Config.example.xcconfig

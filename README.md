@@ -139,19 +139,35 @@ After each reply there are two more checks. Any `Sources:` line has to point at 
 
 ## Deploying to Supabase
 
-I run these myself against project `awktjbhyzibjrlskrwvu`. First make `supabase/.env.hosted` from the example, with `ALLOW_REDTEAM=false`. Then:
+You need a Supabase project of your own. Its project ref is the ID in the dashboard URL. First make `supabase/.env.hosted` from the example, with your Anthropic key and `ALLOW_REDTEAM=false`, and run `make doctor` to check it.
+
+```bash
+cp supabase/.env.example supabase/.env.hosted
+```
+
+Then log in and link the project. Linking asks for the database password.
 
 ```bash
 supabase login
 ```
 
 ```bash
-supabase link --project-ref awktjbhyzibjrlskrwvu
+supabase link --project-ref <your-project-ref>
 ```
+
+Load the schema and the sample data. The first time, push the migration with the seed:
 
 ```bash
 supabase db push --include-seed
 ```
+
+If the project is already set up and you want it to match the repo again (for example after the seed changed), reset it instead. This wipes the hosted database, including any chats, and reloads the schema and seed:
+
+```bash
+supabase db reset --linked
+```
+
+Set the function's secrets and deploy it:
 
 ```bash
 supabase secrets set --env-file supabase/.env.hosted
@@ -161,7 +177,15 @@ supabase secrets set --env-file supabase/.env.hosted
 supabase functions deploy agent
 ```
 
-Only use `--include-seed` the first time. Also turn on anonymous sign-ins in the dashboard (Authentication → Sign In / Providers → Allow anonymous sign-ins), because `config.toml` only covers the local setup. Then point `ios/Bookly/Config.xcconfig` at the hosted URL and anon key.
+Turn on anonymous sign-ins in the dashboard (Authentication → Sign In / Providers → Allow anonymous sign-ins), because `config.toml` only covers the local setup.
+
+To check the hosted function, copy `evals/.env.example` to `evals/.env.remote` and fill it in with the hosted URL, anon key and service role key (Project Settings → API Keys). Then run one scenario against it:
+
+```bash
+deno run -A evals/run.ts --remote --only order_status_clarify
+```
+
+To use the hosted project from the app, point `ios/Bookly/Config.xcconfig` at the hosted URL and anon key.
 
 Putting the app on TestFlight is in [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md).
 

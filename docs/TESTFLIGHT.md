@@ -4,7 +4,7 @@ Internal testing only: up to 100 people on your App Store Connect team, with no 
 
 ## 1. Point the app at the hosted project
 
-In `ios/Bookly/Config.xcconfig`, set the hosted project URL (`https:/$()/awktjbhyzibjrlskrwvu.supabase.co`) and the hosted anon key. Never put the service-role or Anthropic key here. Run `make doctor` to confirm.
+In `ios/Bookly/Config.xcconfig`, set the hosted project URL (`https:/$()/<your-project-ref>.supabase.co`) and the hosted anon key. Never put the service-role or Anthropic key here. Run `make doctor` to confirm.
 
 Make sure the hosted project has anonymous sign-ins enabled and `ALLOW_REDTEAM=false` (see the README's deploy section).
 
