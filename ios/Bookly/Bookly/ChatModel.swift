@@ -18,6 +18,8 @@ final class ChatModel {
     var turns: [Turn] = []
     var isEscalated = false
     var escalation: Escalation?
+    // Tap-to-answer options for the latest reply. Typing always works too.
+    var suggestions: [String] = []
     var isSending = false
     var error: String?
     private var failedMessage: String?
@@ -30,7 +32,17 @@ final class ChatModel {
 
     func load() async {
         guard let conversationId, turns.isEmpty else { return }
-        guard let history = try? await Backend.history(conversationId: conversationId) else { return }
+        let history: History?
+        do {
+            history = try await Backend.history(conversationId: conversationId)
+        } catch {
+            return  // Offline: keep the id and try again next launch.
+        }
+        // The saved conversation no longer exists (cleaned up, or a different device session).
+        guard let history else {
+            self.conversationId = nil
+            return
+        }
         turns = history.turns.map { turn in
             let (reply, citations) = Self.splitSources(turn.reply ?? "", trace: turn.trace)
             return Turn(user: turn.user, reply: reply, trace: turn.trace, citations: citations)
@@ -56,14 +68,16 @@ final class ChatModel {
         turns = []
         isEscalated = false
         escalation = nil
+        suggestions = []
         error = nil
         failedMessage = nil
     }
 
-    private func deliver(_ message: String) async {
+    private func deliver(_ message: String, retryingAsNew: Bool = false) async {
         isSending = true
         error = nil
         failedMessage = nil
+        suggestions = []
         defer { isSending = false }
         do {
             let response = try await Backend.send(message, conversationId: conversationId)
@@ -75,6 +89,12 @@ final class ChatModel {
             }
             isEscalated = response.status == "escalated"
             escalation = response.escalation ?? escalation
+            suggestions = response.suggestions ?? []
+        } catch BackendError.conversationGone where !retryingAsNew {
+            // The server no longer has this conversation: start a new one with the same message.
+            conversationId = nil
+            isSending = false
+            await deliver(message, retryingAsNew: true)
         } catch {
             failedMessage = message
             self.error = (error as? BackendError)?.errorDescription ?? Self.networkError

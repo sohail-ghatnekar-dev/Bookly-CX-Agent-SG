@@ -1,6 +1,7 @@
 // One customer turn: model loop, tool execution, post-checks, persistence.
 import { createMessage } from "./anthropic.ts";
 import { buildSystemPrompt, FALLBACK_REPLY, type ProcedureRef, REFUSAL_REPLY } from "./prompts.ts";
+import { suggestReplies } from "./suggest.ts";
 import { executeTool, TOOL_DEFS } from "./tools.ts";
 import type { ContentBlock, Message, ToolContext } from "./types.ts";
 
@@ -15,6 +16,7 @@ const CLAIM =
 export interface TurnResult {
   reply: string;
   citations: string[];
+  suggestions: string[];
 }
 
 export async function runTurn(ctx: ToolContext, turn: number, userText: string): Promise<TurnResult> {
@@ -53,7 +55,20 @@ export async function runTurn(ctx: ToolContext, turn: number, userText: string):
   const { text, citations } = await checkSources(ctx, reply);
   await checkClaims(ctx, text);
   await persist(ctx, turn, history.length, added);
-  return { reply: text, citations };
+  return { reply: text, citations, suggestions: await suggestionsFor(ctx, text) };
+}
+
+async function suggestionsFor(ctx: ToolContext, reply: string): Promise<string[]> {
+  const { data, error } = await ctx.db.from("trace_events").select("label, outcome, rule_id, output")
+    .eq("conversation_id", ctx.conv.id).in("label", ["eligibility", "initiate_return", "list_orders"]).order("seq");
+  if (error) throw error;
+  return suggestReplies({
+    reply,
+    procedure: ctx.conv.current_procedure,
+    verified: !!ctx.conv.verified_customer_id,
+    escalated: ctx.conv.status === "escalated",
+    events: data,
+  });
 }
 
 // (a) Strip the trailing Sources line; cite IDs that exist in policy_docs, flag ones that don't.

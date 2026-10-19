@@ -151,6 +151,39 @@ struct TypingIndicator: View {
     }
 }
 
+struct Chip: View {
+    let text: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(text, action: action)
+            .font(Theme.label)
+            .foregroundStyle(Theme.ink)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Theme.card, in: Capsule())
+            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
+    }
+}
+
+// Suggested answers under the latest reply. Tapping one sends it as the customer's message.
+struct SuggestionRow: View {
+    let options: [String]
+    let onPick: (String) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(options, id: \.self) { option in
+                    Chip(text: option) { onPick(option) }
+                        .accessibilityLabel("Suggested reply: \(option)")
+                }
+            }
+            .padding(.vertical, 1)
+        }
+    }
+}
+
 struct ErrorRow: View {
     let text: String
     let canRetry: Bool

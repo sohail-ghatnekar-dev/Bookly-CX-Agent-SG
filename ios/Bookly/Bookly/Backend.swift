@@ -42,6 +42,7 @@ struct AgentReply: Decodable {
     let reply: String
     let status: String
     let citations: [String]
+    let suggestions: [String]?
     let trace: [TraceLine]
     let escalation: Escalation?
 }
@@ -77,6 +78,7 @@ struct History {
 
 enum BackendError: LocalizedError {
     case message(String)
+    case conversationGone
     var errorDescription: String? {
         if case .message(let text) = self { return text }
         return nil
@@ -121,6 +123,8 @@ enum Backend {
                 ),
                 decoder: decoder
             )
+        } catch FunctionsError.httpError(let code, _) where code == 404 {
+            throw BackendError.conversationGone
         } catch FunctionsError.httpError(let code, let data) where code == 429 || code == 400 {
             // The function's own friendly errors (message limit, bad input) are shown as written.
             let body = try? JSONDecoder().decode([String: String].self, from: data)

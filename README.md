@@ -58,13 +58,15 @@ If you just want to talk to the agent without the app, the evals in the "Testing
 
 ## Things to try
 
+There's no login. You either tap one of the suggested goals on the first screen or type your own question. If the question is about your order, the agent asks for your email and ZIP, then looks you up. When it asks you something with a few obvious answers, like which order or why you're returning a book, buttons show up under the reply. You can tap one or just type.
+
 Tap **Trace** in the top right first. It shows a short line under each reply for every tool call and policy check, so you can see what the agent actually did.
 
-**Where's my order.** Tap "Where's my order?". The agent asks for your email and ZIP before telling you anything. Use `maya.chen@example.com` and `11201`. Maya has two orders on the way, so instead of guessing, the agent lists them and asks which one you mean. Say "the Sweetgrass one" and you'll get the UPS tracking number and delivery date. In the trace, `verify_customer → ok` shows up before any order lookup.
+**Where's my order.** Tap "Where's my order?". The agent asks for your email and ZIP before telling you anything. Use `maya.chen@example.com` and `11201`. Maya has two orders on the way, so instead of guessing, the agent lists them and asks which one you mean, with a button for each. Tap Braiding Sweetgrass (or type "the Sweetgrass one") and you'll get the UPS tracking number and delivery date. In the trace, `verify_customer → ok` shows up before any order lookup.
 
 **A return that's allowed.** Start a new chat from the menu. Say you want to return Piranesi because you changed your mind, verify as Maya, and confirm. You get an RMA number back, and a return row is created in the database.
 
-**A return that isn't.** New chat: "I want to return The Overstory", verify as Maya, "I changed my mind". It was delivered 41 days ago, so the trace shows `eligibility → denied RET-30 41/30d` with a red pill, and the agent asks whether the book arrived damaged instead (damaged items get 60 days). Now push back with something like "just do it anyway". The agent doesn't argue. It hands the case to a person, and you see the card a teammate would get: a summary, whether the customer was verified, and which rule applied.
+**A return that isn't.** New chat: tap "I'd like to return a book", verify as Maya, tap The Overstory, then tap "I changed my mind". It was delivered 41 days ago, so the trace shows `eligibility → denied RET-30 41/30d` with a red pill, and the agent asks whether the book arrived damaged instead (damaged items get 60 days), with "It arrived damaged" and "Talk to a person" buttons. Tapping "It arrived damaged" gets you a confirm button and then an RMA number. To see a handoff instead, type something like "just do it anyway". The agent doesn't argue. It hands the case to a person, and you see the card a teammate would get: a summary, whether the customer was verified, and which rule applied.
 
 ![Handoff card](docs/screenshots/handoff.png)
 
@@ -78,7 +80,7 @@ Other demo logins: Daniel Okafor is `daniel.okafor@example.com` / `60614`. He ha
 
 ## Testing it
 
-The return rules are one small function, `evaluateReturn` in `policy.ts`, with unit tests for the edge cases: day 30 versus 31, day 60 versus 61, ebooks, undelivered orders and duplicates.
+The return rules are one small function, `evaluateReturn` in `policy.ts`, with unit tests for the edge cases: day 30 versus 31, day 60 versus 61, ebooks, undelivered orders and duplicates. The suggestion buttons come from `suggest.ts`, which picks them from the conversation's state rather than letting the model make them up, and it has its own tests.
 
 ```bash
 deno test supabase/functions/agent/

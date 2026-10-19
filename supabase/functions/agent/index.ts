@@ -1,4 +1,4 @@
-// POST /agent { conversation_id?, message, redteam? }
+// POST /agent { conversation_id?, message, redteam? } → { reply, citations, suggestions, trace, … }
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { runTurn } from "./agent.ts";
 import { AnthropicError } from "./anthropic.ts";
@@ -50,6 +50,7 @@ Deno.serve(async (req) => {
         reply: ESCALATED_REPLY,
         status: "escalated",
         citations: [],
+        suggestions: [],
         trace: [],
         escalation: await latestEscalation(conv.id),
       });
@@ -62,7 +63,7 @@ Deno.serve(async (req) => {
 
     const redteam = body?.redteam === true && Deno.env.get("ALLOW_REDTEAM") === "true";
     const ctx: ToolContext = { db, conv, trace: new Trace(await nextTraceSeq(conv.id)), redteam };
-    const { reply, citations } = await runTurn(ctx, turn, message);
+    const { reply, citations, suggestions } = await runTurn(ctx, turn, message);
 
     return json({
       conversation_id: conv.id,
@@ -70,6 +71,7 @@ Deno.serve(async (req) => {
       reply,
       status: conv.status,
       citations,
+      suggestions,
       trace: ctx.trace.forClient(),
       ...(ctx.escalation ? { escalation: ctx.escalation } : {}),
     });

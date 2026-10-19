@@ -21,6 +21,11 @@ struct ChatView: View {
                     if model.isSending {
                         TypingIndicator()
                     }
+                    if !model.isSending && !model.isEscalated && model.error == nil && !model.suggestions.isEmpty {
+                        SuggestionRow(options: model.suggestions) { option in
+                            Task { await model.send(option) }
+                        }
+                    }
                     if let error = model.error {
                         ErrorRow(text: error, canRetry: model.canRetry) {
                             Task { await model.retry() }
@@ -38,6 +43,7 @@ struct ChatView: View {
             .onChange(of: model.turns.count) { scrollToBottom(proxy) }
             .onChange(of: model.isSending) { scrollToBottom(proxy) }
             .onChange(of: model.isEscalated) { scrollToBottom(proxy) }
+            .onChange(of: model.suggestions) { scrollToBottom(proxy) }
         }
         .safeAreaInset(edge: .bottom) { inputBar }
         .background(Theme.paper.ignoresSafeArea())
@@ -55,13 +61,7 @@ struct ChatView: View {
                 .foregroundStyle(Theme.ink)
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(starters, id: \.self) { starter in
-                    Button(starter) { Task { await model.send(starter) } }
-                        .font(Theme.label)
-                        .foregroundStyle(Theme.ink)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Theme.card, in: Capsule())
-                        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: Theme.hairlineWidth))
+                    Chip(text: starter) { Task { await model.send(starter) } }
                 }
             }
         }
