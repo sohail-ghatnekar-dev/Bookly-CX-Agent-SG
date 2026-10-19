@@ -13,7 +13,6 @@ final class ChatModel {
     }
 
     private static let conversationKey = "conversationId"
-    static let networkError = "Couldn't reach Bookly support. Try again."
 
     var turns: [Turn] = []
     var isEscalated = false
@@ -103,7 +102,7 @@ final class ChatModel {
             await startOver(with: message)
         } catch {
             failedMessage = message
-            self.error = (error as? BackendError)?.errorDescription ?? Self.networkError
+            self.error = (error as? BackendError)?.errorDescription ?? Backend.networkError
         }
     }
 

@@ -8,8 +8,8 @@ import type { ContentBlock, Message, ToolContext } from "./types.ts";
 const MAX_STEPS = 6;
 const SOURCES_LINE = /\n?[ \t]*Sources?:([^\n]*)$/;
 const DOC_ID = /\b[A-Z]{2,}-[A-Z0-9]+\b/g;
-// The spec's claim pattern, except that a negation or modal around the noun and verb
-// ("returns must be started within 30 days", "no return has been started") reads as a rule, not a claim.
+// A reply that says a return or refund happened, or quotes an RMA. A negation or modal around the noun
+// and verb ("returns must be started within 30 days", "no return has been started") reads as a rule, not a claim.
 const CLAIM =
   /(?<!\bno\s+)(return|refund)(?:(?!\b(?:must|can|cannot|will|would|should|could|be|not|never)\b|n't\b)[^.])*\b(approved|initiated|started|processed|issued|created)\b|\bRMA-\d+/i;
 
@@ -20,7 +20,7 @@ export interface TurnResult {
 }
 
 export async function runTurn(ctx: ToolContext, turn: number, userText: string): Promise<TurnResult> {
-  const { db, conv, trace } = ctx;
+  const { conv, trace } = ctx;
   const history = await loadHistory(ctx);
   const index = await loadProcedureIndex(ctx);
   const added: Message[] = [{ role: "user", content: [{ type: "text", text: userText }] }];

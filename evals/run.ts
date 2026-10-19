@@ -1,8 +1,8 @@
 // Scenario evals: scripted turns against the agent function, structural assertions on the trace and DB.
-// deno run -A evals/run.ts [--repeat 5] [--only id] [--remote] [--model <id>] [--compare <modelA>,<modelB>]
+// deno run -A evals/run.ts [--repeat 5] [--only id] [--remote]
 import { parseArgs } from "jsr:@std/cli@1/parse-args";
 import { fromFileUrl } from "jsr:@std/path@1/from-file-url";
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 type Match = { label: string; outcome?: string; rule_id?: string; detail?: string };
 type Assertion =
@@ -35,30 +35,19 @@ interface Run {
 }
 
 const ROOT = fromFileUrl(new URL("..", import.meta.url));
-const args = parseArgs(Deno.args, { string: ["only", "model", "compare", "repeat"], boolean: ["remote"] });
+const args = parseArgs(Deno.args, { string: ["only", "repeat"], boolean: ["remote"] });
 const repeat = Number(args.repeat ?? 1);
 const env = readEnv(`${ROOT}evals/${args.remote ? ".env.remote" : ".env"}`);
 const scenarios: Scenario[] = JSON.parse(await Deno.readTextFile(`${ROOT}evals/scenarios.json`))
   .filter((s: Scenario) => !args.only || s.id === args.only);
 const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
-if ((args.model || args.compare) && args.remote) fail("--model and --compare run against the local function only");
 if (!scenarios.length) fail(`no scenario named ${args.only}`);
 
-if (args.compare) {
-  const models = args.compare.split(",").map((m) => m.trim()).filter(Boolean);
-  const results: Record<string, Record<string, Run[]>> = {};
-  for (const model of models) results[model] = await withLocalModel(model, () => runSuite(model));
-  printCompare(models, results);
-  await writeJson("compare.json", { ran_at: new Date().toISOString(), repeat, models, results });
-} else if (args.model) {
-  await withLocalModel(args.model, () => runSuite(args.model!));
-} else {
-  const model = readEnv(`${ROOT}supabase/${args.remote ? ".env.hosted" : ".env"}`, false).ANTHROPIC_MODEL ?? "unknown";
-  await runSuite(model);
-}
+const model = readEnv(`${ROOT}supabase/${args.remote ? ".env.hosted" : ".env"}`, false).ANTHROPIC_MODEL ?? "claude-haiku-5-5";
+await runSuite(model);
 
-async function runSuite(model: string): Promise<Record<string, Run[]>> {
+async function runSuite(model: string) {
   console.log(`\nModel ${model} · ${scenarios.length} scenarios × ${repeat} · ${env.SUPABASE_URL}`);
   const results: Record<string, Run[]> = {};
   for (const s of scenarios) {
@@ -82,7 +71,6 @@ async function runSuite(model: string): Promise<Record<string, Run[]>> {
   const { error } = await db.from("eval_runs").insert(totals);
   if (error) console.error(`could not record eval_runs row: ${error.message}`);
   await writeJson("latest.json", { ran_at: new Date().toISOString(), repeat, ...totals, results });
-  return results;
 }
 
 async function runScenario(s: Scenario): Promise<Run> {
@@ -210,61 +198,6 @@ async function cleanup(conversationId: string) {
   }
 }
 
-// Serves the local function with ANTHROPIC_MODEL overridden, via a temp env file outside the repo.
-async function withLocalModel<T>(model: string, fn: () => Promise<T>): Promise<T> {
-  const base = await Deno.readTextFile(`${ROOT}supabase/.env`);
-  const envFile = await Deno.makeTempFile({ suffix: ".env" });
-  await Deno.chmod(envFile, 0o600);
-  await Deno.writeTextFile(envFile, base.replace(/^ANTHROPIC_MODEL=.*$/m, "").trimEnd() + `\nANTHROPIC_MODEL=${model}\n`);
-  const child = new Deno.Command("supabase", {
-    args: ["functions", "serve", "agent", "--env-file", envFile],
-    cwd: ROOT,
-    stdout: "piped",
-    stderr: "piped",
-  }).spawn();
-  // The temp file holds the API key, so remove it even if the run is interrupted.
-  const onSignal = () => {
-    child.kill("SIGTERM");
-    Deno.removeSync(envFile);
-    Deno.exit(130);
-  };
-  Deno.addSignalListener("SIGINT", onSignal);
-  Deno.addSignalListener("SIGTERM", onSignal);
-  try {
-    await waitForOutput(child, "Serving functions on");
-    console.log(`Serving the function locally with ANTHROPIC_MODEL=${model}`);
-    return await fn();
-  } finally {
-    Deno.removeSignalListener("SIGINT", onSignal);
-    Deno.removeSignalListener("SIGTERM", onSignal);
-    child.kill("SIGTERM");
-    await child.status;
-    await Deno.remove(envFile);
-    console.log("Stopped the eval function server. Run `make serve` to serve with supabase/.env again.");
-  }
-}
-
-async function waitForOutput(child: Deno.ChildProcess, text: string) {
-  const decoder = new TextDecoder();
-  const watch = async (stream: ReadableStream<Uint8Array>) => {
-    let seen = "";
-    for await (const chunk of stream) {
-      seen += decoder.decode(chunk);
-      if (seen.includes(text)) return;
-    }
-    throw new Error("function server exited before it was ready");
-  };
-  // Keep draining both streams after readiness so the child never blocks on a full pipe.
-  const [out, err] = [child.stdout.tee(), child.stderr.tee()];
-  out[1].pipeTo(new WritableStream()).catch(() => {});
-  err[1].pipeTo(new WritableStream()).catch(() => {});
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("function server did not start in 120s")), 120_000);
-  });
-  await Promise.race([watch(out[0]), watch(err[0]), timeout]).finally(() => clearTimeout(timer));
-}
-
 function printTable(model: string, results: Record<string, Run[]>) {
   console.log(`\n${model}`);
   console.log(`${"scenario".padEnd(34)}${"pass".padEnd(8)}${"res/esc/fail".padEnd(14)}guard_fired`);
@@ -279,17 +212,6 @@ function printTable(model: string, results: Record<string, Run[]>) {
   const gated = scenarios.filter((s) => s.gate !== false);
   const gatePass = gated.every((s) => results[s.id].every((r) => r.passed));
   console.log(`\nDemo gate (gated scenarios pass every run): ${gatePass ? "PASS" : "FAIL"}`);
-}
-
-function printCompare(models: string[], results: Record<string, Record<string, Run[]>>) {
-  console.log(`\n${"scenario".padEnd(34)}${models.map((m) => `${m} pass / guard`.padEnd(44)).join("")}`);
-  for (const s of scenarios) {
-    const cells = models.map((m) => {
-      const runs = results[m][s.id];
-      return `${runs.filter((r) => r.passed).length}/${runs.length}  ${guardSummary(s, runs)}`.padEnd(44);
-    });
-    console.log(`${(s.id + (s.gate === false ? " (stat)" : "")).padEnd(34)}${cells.join("")}`);
-  }
 }
 
 // "return_blocked 3/5" for a scenario's designated guard, otherwise any guard labels that fired.

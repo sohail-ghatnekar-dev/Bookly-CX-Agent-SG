@@ -25,13 +25,6 @@ export function modelId(): string {
   return Deno.env.get("ANTHROPIC_MODEL") || "claude-haiku-5-5";
 }
 
-// Thinking stays off: the system prompt changes between turns, and replayed thinking
-// blocks are rejected once the prefix changes. Sonnet 5.5 spells "off" as between_tools.
-// Temperature is omitted because current models reject non-default sampling values.
-function thinkingOff(model: string) {
-  return model.startsWith("claude-sonnet-5-5") ? { type: "between_tools" } : { type: "disabled" };
-}
-
 export async function createMessage(
   system: string,
   messages: Message[],
@@ -39,14 +32,16 @@ export async function createMessage(
 ): Promise<ApiResponse> {
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set");
-  const model = modelId();
+  // Thinking stays off: the system prompt changes between turns, and replayed thinking
+  // blocks are rejected once the prefix changes. Temperature is omitted because Haiku 5.5
+  // rejects non-default sampling values.
   const body = JSON.stringify({
-    model,
+    model: modelId(),
     max_tokens: MAX_TOKENS,
     system,
     messages,
     tools,
-    thinking: thinkingOff(model),
+    thinking: { type: "disabled" },
   });
 
   for (let attempt = 0;; attempt++) {

@@ -38,7 +38,7 @@ struct ProceduresView: View {
         .navigationTitle("Procedures")
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
-            if loadFailed { Text(ChatModel.networkError).font(Theme.label).foregroundStyle(Theme.muted) }
+            if loadFailed { Text(Backend.networkError).font(Theme.label).foregroundStyle(Theme.muted) }
         }
         .task {
             do {

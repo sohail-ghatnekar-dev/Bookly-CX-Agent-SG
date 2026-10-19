@@ -21,22 +21,22 @@ export const DAMAGED = "It arrived damaged";
 export const CHANGED_MIND = "I changed my mind";
 export const CONFIRM = "Yes, start the return";
 export const DECLINE = "No, thanks";
-export const HUMAN = "Send to an employee";
-export const ACCEPT_PERSON = "Yes, send it to an employee";
+export const EMPLOYEE = "Send to an employee";
+export const ACCEPT_EMPLOYEE = "Yes, send it to an employee";
 
 export function suggestReplies(s: SuggestionInput): string[] {
   // A handed-off case takes no more input, and buttons only answer a question.
   if (s.escalated || !s.reply.includes("?")) return [];
   const options = s.verified ? forVerified(s) : [];
   if (options.length) return options;
-  return offersPerson(s.reply) ? [ACCEPT_PERSON, DECLINE] : [];
+  return offersEmployee(s.reply) ? [ACCEPT_EMPLOYEE, DECLINE] : [];
 }
 
 // "Should I send this to a Bookly employee?" and the like.
-function offersPerson(reply: string): boolean {
+function offersEmployee(reply: string): boolean {
   return reply.split(/(?<=[.?!])\s+/).some((sentence) =>
     sentence.trim().endsWith("?") &&
-    /\b(employee|person|teammate|human|someone on our team)\b/i.test(sentence) &&
+    /\b(employee|person|human|someone on our team)\b/i.test(sentence) &&
     /\b(would you like|shall i|should i|do you want|want me to|can i)\b/i.test(sentence)
   );
 }
@@ -48,7 +48,7 @@ function forVerified(s: SuggestionInput): string[] {
     s.events.slice(s.events.indexOf(check)).some((e) => e.label === "initiate_return" && e.outcome === "ok");
   if (check && !started) {
     if (check.outcome === "ok") return [CONFIRM, DECLINE];
-    if (check.outcome === "denied") return check.rule_id === "RET-30" ? [DAMAGED, HUMAN] : [HUMAN];
+    if (check.outcome === "denied") return check.rule_id === "RET-30" ? [DAMAGED, EMPLOYEE] : [EMPLOYEE];
   }
 
   if (s.procedure === "returns" && /damaged|defective/i.test(s.reply) && /chang\w* (your|their) mind|change of mind/i.test(s.reply)) {

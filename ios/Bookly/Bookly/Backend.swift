@@ -87,6 +87,8 @@ enum BackendError: LocalizedError {
 }
 
 enum Backend {
+    static let networkError = "Couldn't reach Bookly support. Try again."
+
     private static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -137,7 +139,7 @@ enum Backend {
         } catch FunctionsError.httpError(let code, let data) where code == 429 || code == 400 {
             // The function's own friendly errors (message limit, bad input) are shown as written.
             let body = try? JSONDecoder().decode([String: String].self, from: data)
-            throw BackendError.message(body?["error"] ?? "Couldn't reach Bookly support. Try again.")
+            throw BackendError.message(body?["error"] ?? networkError)
         }
     }
 

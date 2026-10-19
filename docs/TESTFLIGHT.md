@@ -13,7 +13,7 @@ Make sure the hosted project has anonymous sign-ins enabled and `ALLOW_REDTEAM=f
 1. Open `ios/Bookly/Bookly.xcodeproj` in Xcode.
 2. Select the **Bookly** target, then **Signing & Capabilities**.
 3. Choose your **Team**, and keep **Automatically manage signing** on.
-4. Replace the bundle identifier `com.REPLACE_ME.bookly` with one you own, for example `com.yourname.bookly`.
+4. Replace the bundle identifier `com.example.bookly` with one you own, for example `com.yourname.bookly`.
 5. In App Store Connect → **Apps** → **+** → **New App**, create the app with that bundle ID, platform iOS, name "Bookly" (or any available name), and SKU `bookly`.
 
 ## 3. Bump the build number

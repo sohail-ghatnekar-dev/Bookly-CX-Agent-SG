@@ -54,12 +54,12 @@ Deno.test("eligible and not started: confirm or decline", () => {
   assertEquals(suggestReplies(input({ reply, events: [orders, eligibility("ok", "RET-30")] })), ["Yes, start the return", "No, thanks"]);
 });
 
-Deno.test("past 30 days: offer the damaged route or a person", () => {
+Deno.test("past 30 days: offer the damaged route or an employee", () => {
   const reply = "That’s past the 30-day window. Did it arrive damaged?";
   assertEquals(suggestReplies(input({ reply, events: [orders, eligibility("denied", "RET-30")] })), ["It arrived damaged", "Send to an employee"]);
 });
 
-Deno.test("ebook denial only offers a person", () => {
+Deno.test("ebook denial only offers an employee", () => {
   const reply = "Ebooks can’t be returned. Can I help with anything else?";
   assertEquals(suggestReplies(input({ reply, events: [orders, eligibility("denied", "RET-DIGITAL")] })), ["Send to an employee"]);
 });
@@ -69,13 +69,13 @@ Deno.test("after the return is created, no confirm buttons", () => {
   assertEquals(suggestReplies(input({ reply: "Anything else?", events: [orders, eligibility("ok", "RET-30"), started] })), []);
 });
 
-Deno.test("an offer of a person gets yes or no, verified or not", () => {
+Deno.test("an offer to send it to an employee gets yes or no, verified or not", () => {
   const reply = "It’s running late. Should I send this to a Bookly employee to look into it?";
   assertEquals(suggestReplies(input({ reply, procedure: "order_status" })), ["Yes, send it to an employee", "No, thanks"]);
-  assertEquals(suggestReplies(input({ reply: "I don’t have that information. Would you like to talk to a person?", verified: false, procedure: "policy_qa", events: [] })), ["Yes, send it to an employee", "No, thanks"]);
+  assertEquals(suggestReplies(input({ reply: "I don’t have that information. Would you like me to send this to a Bookly employee?", verified: false, procedure: "policy_qa", events: [] })), ["Yes, send it to an employee", "No, thanks"]);
 });
 
-Deno.test("mentioning a person outside the question is not an offer", () => {
+Deno.test("mentioning an employee outside the question is not an offer", () => {
   const reply = "A Bookly employee can help with that. Is there anything else I can help with?";
   assertEquals(suggestReplies(input({ reply, verified: false, procedure: "policy_qa", events: [] })), []);
 });

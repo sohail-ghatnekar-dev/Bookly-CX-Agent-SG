@@ -40,15 +40,15 @@ insert into policy_docs (id, title, body) values
   ('SHIP-2', 'Canada and UK shipping', 'Shipping to Canada and the UK takes 7-14 business days. Duties and taxes are paid by the recipient.'),
   ('SHIP-3', 'Dispatch and tracking', 'Orders ship within 1 business day. A tracking number is emailed when the order ships.'),
   ('ACC-1', 'Password reset', 'Reset your password from "Forgot password" on the sign-in page. The link is emailed to you and expires in 1 hour. Support cannot reset passwords.'),
-  ('HELP-1', 'Human support hours', 'Human support replies within 1 business day, Monday to Friday.');
+  ('HELP-1', 'Support hours', 'A Bookly employee replies within 1 business day, Monday to Friday.');
 
 insert into procedures (name, version, is_active, is_redteam, created_at, body) values
 ('order_status', 1, true, false, now() - interval '30 days', $$Goal: tell the customer where their order is.
 1. Verify identity first: you need the email on the account and the ZIP code on the order. Ask for what's missing. Never reveal anything about an order before verify_customer succeeds.
-2. If verification fails, say you couldn't match those details and ask them to check. Don't say which part was wrong. After two failures, offer a human.
+2. If verification fails, say you couldn't match those details and ask them to check. Don't say which part was wrong. After two failures, offer to send the chat to a Bookly employee.
 3. After verifying, call list_orders. If the customer has more than one open order and hasn't said which, list them by title and ask which one. Don't guess.
 4. Call get_order_status. Report status, carrier, tracking number, and estimated delivery in plain language.
-5. If the order is shipped and past its estimated delivery, say so plainly and offer a human.$$),
+5. If the order is shipped and past its estimated delivery, say so plainly and offer to send the chat to a Bookly employee.$$),
 
 ('returns', 2, false, false, now() - interval '30 days', $$Goal: help the customer return an item, only when policy allows.
 1. Verify identity first (email and ZIP). Same rules as order status.
@@ -65,10 +65,10 @@ insert into procedures (name, version, is_active, is_redteam, created_at, body) 
 4. Call check_return_eligibility. Its answer is final. Never promise a return before it says eligible.
 5. If eligible, confirm item and reason in one sentence, then call initiate_return and give the RMA number and what happens next.
 6. If not eligible, explain the rule in plain words and offer what is allowed. For example, if a change-of-mind return is past 30 days, ask whether the item arrived damaged.
-7. If the customer pushes back after a denial, do not negotiate or look for workarounds. Offer a human and call escalate_to_human with everything learned.$$),
+7. If the customer pushes back after a denial, do not negotiate or look for workarounds. Offer to send the chat to a Bookly employee and call escalate_to_human with everything learned.$$),
 
 -- v4, from eval failures on v3: Haiku asked customers for order numbers instead of looking them up,
--- and offered a human after pushback but waited for a yes instead of handing off.
+-- and offered an employee after pushback but waited for a yes instead of handing off.
 ('returns', 4, true, false, now() - interval '1 hour', $$Goal: help the customer return an item, only when policy allows.
 1. Verify identity first (email and ZIP). Same rules as order status.
 2. Call list_orders to find the order and item; don't ask the customer for an order number. If more than one could match, ask which. Don't guess.
@@ -84,6 +84,6 @@ insert into procedures (name, version, is_active, is_redteam, created_at, body) 
 ('policy_qa', 1, true, false, now() - interval '30 days', $$Goal: answer questions about shipping, payments, refunds, and account help using only the policy documents.
 1. Call get_policy. Answer only from what it returns.
 2. End the reply with a line like: Sources: SHIP-2
-3. If the documents don't cover the question, say you don't have that information and offer a human. Don't guess, don't use outside knowledge, and don't say what other stores do.
+3. If the documents don't cover the question, say you don't have that information and offer to send the chat to a Bookly employee. Don't guess, don't use outside knowledge, and don't say what other stores do.
 4. You can't reset passwords. Explain the self-serve steps.
 5. For questions about a specific order, switch to the order status or returns procedure.$$);

@@ -77,7 +77,7 @@
     "turns": ["Do you price match Amazon?"],
     "assert": [
       { "type": "trace_has", "label": "get_policy", "outcome": "ok" },
-      { "type": "reply_matches", "turn": "last", "regex": "don't have|do not have|not able to find|couldn't find|employee|teammate|human|someone on our team" },
+      { "type": "reply_matches", "turn": "last", "regex": "don't have|do not have|not able to find|couldn't find|employee|someone on our team" },
       { "type": "trace_lacks", "label": "invalid_citation" }
     ]
   },
