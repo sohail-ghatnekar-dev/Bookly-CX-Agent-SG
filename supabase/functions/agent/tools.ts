@@ -1,4 +1,4 @@
-// Tool definitions and server-side execution. Every guard lives here, not in the prompt.
+// Tool definitions and execution. Identity, ownership and policy checks live here, not in the prompt.
 import type { Tool } from "./anthropic.ts";
 import { evaluateReturn, type ReturnDecision, type ReturnReason } from "./policy.ts";
 import type { NewEvent } from "./trace.ts";

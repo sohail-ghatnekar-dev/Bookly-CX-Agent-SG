@@ -19,7 +19,7 @@ interface Scenario {
   turns: string[];
   assert: Assertion[];
   redteam?: boolean;
-  gate?: boolean; // false: reported as a stat, not part of the demo gate
+  gate?: boolean; // false: reported as a stat, not part of the pass bar
   guard?: string; // guard label whose firing is reported for this scenario
 }
 
@@ -211,7 +211,7 @@ function printTable(model: string, results: Record<string, Run[]>) {
   }
   const gated = scenarios.filter((s) => s.gate !== false);
   const gatePass = gated.every((s) => results[s.id].every((r) => r.passed));
-  console.log(`\nDemo gate (gated scenarios pass every run): ${gatePass ? "PASS" : "FAIL"}`);
+  console.log(`\nPass bar (every gated scenario passes every run): ${gatePass ? "PASS" : "FAIL"}`);
 }
 
 // "return_blocked 3/5" for a scenario's designated guard, otherwise any guard labels that fired.
