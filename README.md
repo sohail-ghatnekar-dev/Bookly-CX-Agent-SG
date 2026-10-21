@@ -87,9 +87,9 @@ Another test customer: Daniel Okafor, `daniel.okafor@example.com` / `60614`. He 
 | Part | Language | What it does |
 |---|---|---|
 | iPhone app | Swift, SwiftUI | The UI. No login: tap a question or type. |
-| Edge Function | TypeScript on Supabase | The agent loop. Calls the Anthropic Messages API directly with `fetch`, with the active procedure as the prompt. |
-| Tools and checks | TypeScript | Who the customer is, whose orders they can see, what's returnable. |
-| Postgres | SQL on Supabase | Orders, chats, procedures and the trace. This is the agent's memory. |
+| Orchestration | TypeScript, in a Supabase Edge Function | The agent loop. Calls the Anthropic Messages API directly with `fetch`. The prompt is a few base rules plus the active plain-English procedure. |
+| Tools | TypeScript | Who the customer is, whose orders they can see, what's returnable. |
+| Memory | SQL, in Supabase Postgres | Orders, chats, procedures and the trace. |
 
 ```
 iPhone app ── signs in anonymously ──▶ Supabase Auth
