@@ -9,8 +9,8 @@ A good support agent doesn't just answer questions. It fixes the problem, and yo
 So I put deterministic checks first. The model suggests the next step, but my code provides the guardrails:
 
 - **Code decides.** The model can only ask for a tool. The TypeScript tool checks who the customer is, whose orders they can see, and whether a return is in policy before anything happens.
-- **Nothing is guessed.** Facts come only from tool results, any policy it cites has to exist, and an unclear request gets a question.
-- **Every step is recorded.** Each tool call and policy check goes into a trace, with the rule that made the call.
+- **Nothing guessed.** Facts come only from tool results, any policy it cites has to exist, and an unclear request gets a question.
+- **Everything audited.** Each tool call and policy check goes into a trace, with the rule that made the call.
 
 ![Chat with the trace turned on](docs/screenshots/chat-trace.png)
 
