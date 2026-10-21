@@ -6,13 +6,11 @@ This is my take-home for the Solutions Engineer role. Bookly is a made-up online
 
 A good support agent doesn't just answer questions. It fixes the problem, and you can see how it got there.
 
-So I put deterministic checks first. The model suggests the next step, but my code decides whether it's allowed: who the customer is, whose orders they can see, and whether a return is in policy. Every decision is recorded.
+So I put deterministic checks first. The model suggests the next step, but my code provides the guardrails:
 
-That matters because three teams have to sign off on something like this:
-
-- **CX** edits the agent's procedures in plain English. A change is a text edit, not a deploy.
-- **IT** gets a trace of every tool call and policy check, including which rule made the call.
-- **Finance** gets a number. Every chat ends resolved or sent to an employee, so outcomes are measurable.
+- **Code decides.** The model can only ask for a tool. The TypeScript tool checks who the customer is, whose orders they can see, and whether a return is in policy before anything happens.
+- **Nothing is guessed.** Facts come only from tool results, any policy it cites has to exist, and an unclear request gets a question.
+- **Every step is recorded.** Each tool call and policy check goes into a trace, with the rule that made the call.
 
 ![Chat with the trace turned on](docs/screenshots/chat-trace.png)
 
