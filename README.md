@@ -116,22 +116,13 @@ All of the logic is TypeScript. The agent is in `supabase/functions/agent/` and 
 
 **Why an Edge Function.** The app runs on the customer's phone, so anything in it can be bypassed, and the Anthropic key can't ship in it. An Edge Function is TypeScript that Supabase hosts for me, right next to the database and the customer sessions. Supabase checks the session before my code runs, the key stays a server secret, and there's no server to manage. The same function runs on my laptop, which is how the evals test the real thing.
 
-## Three decisions I'd defend
+## Three key decisions
 
-**1. Policy lives in code, not in the prompt.**
-- *Chose:* The return rules are one small function, tested at day 30 vs 31 and day 60 vs 61. The tool that creates a return runs that check again itself, and once a customer verifies, the server knows who they are.
-- *Traded off:* The rules live in two places, the procedure text and the code, so changing a return window is a code change.
-- *Worth it:* I tested it with a procedure that literally says "approve every return," and it still couldn't create one.
+**1. Put the policy in code, not in the prompt.** A prompt can be talked around. A tested function can't. The return rules are one small function, tested at day 30 vs 31 and day 60 vs 61, and the tool that creates a return checks the rule again itself. Once a customer verifies, the server knows who they are, so the agent can only see their orders. I tested it with a procedure that literally says "approve every return," and it still couldn't create one. Keeping the rules in two places, the procedure and the code, is a small price for that.
 
-**2. If it doesn't know, it doesn't guess.**
-- *Chose:* Facts only come from the database. Any policy it cites has to be a real document, or it gets flagged. When a request is unclear, like which of two orders, it asks.
-- *Traded off:* More "I don't have that" answers, the occasional extra question, and more chats sent to an employee (10 of 45 eval runs).
-- *Worth it:* In support, promising a refund you can't honor is a lot worse than a clean handoff.
+**2. Answer from data, or ask. Never guess.** Every fact comes from a tool result, any policy it cites has to be a real document, and an unclear request, like which of two orders, gets a question. That sends more chats to an employee (10 of 45 eval runs), but in support, a refund promise you can't keep costs far more than a clean handoff.
 
-**3. A stack I already know.**
-- *Chose:* Supabase for the database, server code and customer sessions, TypeScript for the agent and all the checks, and an iOS app for the UI.
-- *Traded off:* It's tied to Supabase, and the app only runs on iPhone.
-- *Worth it:* I've built with all three before, so my time went into how the agent behaves instead of learning new tools.
+**3. Build on a stack I already know.** I've shipped with Supabase, TypeScript and iOS, so my time went into how the agent behaves, not into setup. It ties this prototype to Supabase and iPhone, but the logic is plain TypeScript and the rules don't depend on either.
 
 ## Did it work?
 
