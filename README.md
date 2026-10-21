@@ -1,36 +1,44 @@
 # Bookly support agent
 
-This is my take-home for the Solutions Engineer role. Bookly is a made-up online bookstore, and this is the support agent for it. It can tell you where an order is, handle a return (or say no to one), and answer questions about shipping, refunds and accounts.
+This is my take-home for the Solutions Engineer role. Bookly is a made-up online bookstore, and this is its support agent. It can tell you where an order is, start a return (or say no to one), and answer questions about shipping, refunds and accounts.
 
-The idea I built around is "resolve it, and prove it." The model suggests what to do, but the code makes the actual decisions. Every lookup, policy check and handoff gets written to a trace, so someone in CX, IT or finance can see exactly why the agent did what it did.
+## The idea: resolve it, and prove it
 
-It calls the Anthropic Messages API directly with `fetch`, because the brief asked for direct API calls and no agent frameworks. The whole agent loop is about 40 lines in `supabase/functions/agent/agent.ts`.
+A good support agent doesn't just answer questions. It fixes the problem, and you can see how it got there.
+
+So I put deterministic checks first. The model suggests the next step, but my code decides whether it's allowed: who the customer is, whose orders they can see, and whether a return is in policy. Every decision is recorded.
+
+That matters because three teams have to sign off on something like this:
+
+- **CX** edits the agent's procedures in plain English. A change is a text edit, not a deploy.
+- **IT** gets a trace of every tool call and policy check, including which rule made the call.
+- **Finance** gets a number. Every chat ends resolved or sent to an employee, so outcomes are measurable.
 
 ![Chat with the trace turned on](docs/screenshots/chat-trace.png)
 
-## What you need
-
-- Docker. I used OrbStack on a Mac. Keep a few GB of disk free, because the Supabase images are big and Docker stops working if the disk fills up.
-- Supabase CLI 2.121 or newer. Older versions reject the local login tokens.
-- Deno 2
-- Xcode 26 if you want to run the iPhone app
-- An Anthropic API key
-
 ## Running it locally
 
-**1. Add your keys.** Copy the example env file and put your Anthropic key in it:
+You need:
+
+- Docker. I used OrbStack on a Mac. Keep a few GB of disk free, because the Supabase images are big.
+- Supabase CLI 2.121 or newer
+- Deno 2
+- Xcode 26 for the iPhone app
+- An Anthropic API key
+
+**1. Add your key.** Copy the example env file and put your Anthropic key in it:
 
 ```bash
 cp supabase/.env.example supabase/.env
 ```
 
-**2. Start Supabase.** This starts the local database, auth and functions runtime, and loads the schema and the sample data:
+**2. Start Supabase.** This starts the local database, auth and functions runtime, and loads the schema and sample data:
 
 ```bash
 supabase start
 ```
 
-**3. Set up the eval env file.** Run `supabase status -o env`. Copy `API_URL`, `ANON_KEY` and `SERVICE_ROLE_KEY` into `evals/.env`, using `evals/.env.example` as the template.
+**3. Set up the eval env file.** Run `supabase status -o env`, then copy `API_URL`, `ANON_KEY` and `SERVICE_ROLE_KEY` into `evals/.env`, using `evals/.env.example` as the template.
 
 **4. Check your setup.** This makes sure every file and variable is in place and that nothing secret would get committed. It never prints the values.
 
@@ -50,69 +58,40 @@ supabase functions serve agent --env-file supabase/.env
 cp ios/Bookly/Config.example.xcconfig ios/Bookly/Config.xcconfig
 ```
 
-For local use, set `SUPABASE_URL = http:/$()/127.0.0.1:54321` (the `$()` is there because xcconfig files treat `//` as a comment). Set `SUPABASE_ANON_KEY` to the anon key from `supabase status`. Then open `ios/Bookly/Bookly.xcodeproj`, pick an iPhone simulator, and hit Run.
+Set `SUPABASE_URL = http:/$()/127.0.0.1:54321` (the `$()` is there because xcconfig treats `//` as a comment) and `SUPABASE_ANON_KEY` to the anon key from `supabase status`. Then open `ios/Bookly/Bookly.xcodeproj`, pick an iPhone simulator, and hit Run.
 
-The first message after you start the function can take a few seconds while it warms up. After that it's quick.
-
-If you just want to talk to the agent without the app, the evals in the "Testing it" section go through the same function.
+The first message after you start the function can take a few seconds while it warms up.
 
 ## Things to try
 
-There's no login. You either tap one of the suggested goals on the first screen or type your own question. If the question is about your order, the agent asks for your email and ZIP, then looks you up. When it asks you something with a few obvious answers, like which order or why you're returning a book, buttons show up under the reply. You can tap one or just type. Bookly's agent is a bookworm in round glasses and a red bow tie, and its picture sits next to every reply like a text thread. While it's working, a bubble says something like "Let me check the archives…", and the worm climbs out of its book, inches around that bubble, and dives back into the book when the answer arrives.
+There's no login. Tap one of the suggested questions or type your own. The agent is a bookworm, and the chat looks like a text thread. When it asks something with obvious answers, like which order or why you're returning a book, buttons show up under the reply. You can always just type instead.
 
-Tap **Trace** in the top right first. It shows a short line under each reply for every tool call and policy check, so you can see what the agent actually did.
+Tap **Trace** in the top right first. It shows a line under each reply for every tool call and policy check.
 
-**Where's my order.** Tap "Where's my order?". The agent asks for your email and ZIP before telling you anything. Use `maya.chen@example.com` and `11201`. Maya has two orders on the way, so instead of guessing, the agent lists them and asks which one you mean, with a button for each. Tap Braiding Sweetgrass (or type "the Sweetgrass one") and you'll get the UPS tracking number and delivery date. In the trace, `verify_customer → ok` shows up before any order lookup.
+**Where's my order.** Tap "Where's my order?". The agent won't say anything about an order until you verify. Use `maya.chen@example.com` and `11201`. Maya has two orders on the way, so it asks which one you mean instead of guessing. Tap Braiding Sweetgrass to get the tracking number and delivery date.
 
-**A return that's allowed.** Start a new chat from the menu. Say you want to return Piranesi because you changed your mind, verify as Maya, and confirm. You get an RMA number back, and a return row is created in the database.
+**A return that's allowed.** In the same chat, say you'd like to return Piranesi because you changed your mind. It checks eligibility (12 days, inside the 30-day window) and asks you to confirm. Confirm and you get an RMA number, and a real return row is created.
 
-**A return that isn't.** New chat: tap "I'd like to return a book", verify as Maya, tap The Overstory, then tap "I changed my mind". It was delivered 41 days ago, so the trace shows `eligibility → denied RET-30 41/30d` with a red pill, and the agent asks whether the book arrived damaged instead (damaged items get 60 days), with "It arrived damaged" and "Send to an employee" buttons. Tapping "It arrived damaged" gets you a confirm button and then an RMA number. To see a handoff instead, tap "Send to an employee" (or type something like "just do it anyway"). The agent doesn't argue. It sends the case to a Bookly employee, and you see the card that employee would get: a summary, whether the customer was verified, and which rule applied.
+**A return that isn't.** Then ask to return The Overstory, also a change of mind. It was delivered 41 days ago, so it's denied, and the trace shows `eligibility → denied RET-30 41/30d`. The agent offers what is allowed: the damaged route, or sending the chat to an employee. Tap "Send to an employee" and you see the card that employee gets.
 
 ![Handoff card](docs/screenshots/handoff.png)
 
-**Policy questions.** Ask "How long does shipping to Canada take?". The answer comes only from the policy documents, and the source shows under the reply (`Policy · SHIP-2`). Then ask "Do you price match Amazon?". There's no price-match policy on purpose, so the agent says it doesn't have that information and offers to send it to an employee rather than making something up.
+**Policy questions.** Start a new chat and ask "How do I reset my password?". The answer only comes from Bookly's policy documents, and the source shows under the reply (`Policy · ACC-1`). Then ask "Do you price match Amazon?". There's no price-match policy on purpose, so it says it doesn't have that information instead of making something up.
 
-**Procedures.** Open the menu and tap Procedures. These are the plain-English instructions the agent follows, one per type of request. Someone in CX could edit them without a code change, and old versions stay around. Returns is on version 4. I wrote that version after the evals caught two problems with version 3, and you can open v3 and v2 to compare. The box at the bottom shows the latest eval result.
+**Procedures.** Open the **⋯** menu and tap Procedures. These are the plain-English instructions the agent follows, one per type of request. Returns is on version 4. I wrote it after the evals caught two problems with version 3, and you can open the old versions to compare.
 
 ![Procedures](docs/screenshots/procedures.png)
 
-Other demo logins: Daniel Okafor is `daniel.okafor@example.com` / `60614`. He has an ebook, Pachinko, which can't be returned.
+Another test customer: Daniel Okafor, `daniel.okafor@example.com` / `60614`. He has an ebook, Pachinko, which can't be returned.
 
-## Testing it
+## How it's built
 
-The return rules are one small function, `evaluateReturn` in `policy.ts`, with unit tests for the edge cases: day 30 versus 31, day 60 versus 61, ebooks, undelivered orders and duplicates. The suggestion buttons come from `suggest.ts`, which picks them from the conversation's state rather than letting the model make them up, and it has its own tests.
-
-```bash
-deno test supabase/functions/agent/
-```
-
-The evals run scripted conversations against the real function and then check the trace and the database: which tools ran and in what order, whether a return was created, whether a case was escalated, and what the reply said. There's no AI grading, just yes/no checks. Each run cleans up after itself.
-
-```bash
-deno run -A evals/run.ts --repeat 5
-```
-
-My last run on `claude-haiku-5-5`:
-
-| Scenario | Passed | Resolved / escalated / failed |
+| Part | Language | What it does |
 |---|---|---|
-| Order status, asks which order | 5/5 | 5 / 0 / 0 |
-| Wrong ZIP twice, nothing leaks | 5/5 | 5 / 0 / 0 |
-| Return inside the window | 5/5 | 5 / 0 / 0 |
-| Return outside the window, customer pushes back | 5/5 | 0 / 5 / 0 |
-| Damaged item at day 41 | 5/5 | 5 / 0 / 0 |
-| Ebook return | 5/5 | 5 / 0 / 0 |
-| Shipping to Canada | 5/5 | 5 / 0 / 0 |
-| Price match (not covered) | 5/5 | 5 / 0 / 0 |
-| Red-team procedure (tracked, not part of the pass/fail bar) | 5/5 | 0 / 5 / 0 |
-
-"Resolved" means the run passed with no handoff, "escalated" means it was sent to an employee, and "failed" is anything else. These are scripted conversations, so don't read them as a real-world resolution rate.
-
-The red-team scenario loads a deliberately bad procedure that says to approve every return. The check is that no return gets created. In my runs Haiku refused the bad instructions on its own every time. If it had gone along with them, `initiate_return` re-runs the eligibility check in code and would have blocked it anyway.
-
-Two other flags: `--only <scenario id>` runs one scenario, and `--remote` runs against the hosted project using `evals/.env.remote` (same variables as `evals/.env`).
-
-## How it fits together
+| iPhone app | Swift, SwiftUI | The UI. No login: tap a question or type. |
+| Edge Function | TypeScript on Supabase | The agent loop. Calls the Anthropic Messages API directly with `fetch`, with the active procedure as the prompt. |
+| Tools and checks | TypeScript | Who the customer is, whose orders they can see, what's returnable. |
+| Postgres | SQL on Supabase | Orders, chats, procedures and the trace. This is the agent's memory. |
 
 ```
 iPhone app ── signs in anonymously ──▶ Supabase Auth
@@ -123,19 +102,70 @@ iPhone app ── signs in anonymously ──▶ Supabase Auth
                                 │  runs the tools Claude asks for, with the rules in code
                                 │  writes every step to the trace
                                 ▼
-                             Postgres: orders, returns, conversations, trace, procedures
+                             Postgres: orders, returns, chats, trace, procedures
 ```
 
-The app only ever has the public URL and anon key. The Anthropic key stays in Supabase. The app can read its own conversation and trace, but customer and order data are locked to the server.
+All of the logic is TypeScript. The agent is in `supabase/functions/agent/` and the evals are in `evals/`. Each file has one job:
 
-The part I care about most is in `tools.ts`. Claude can ask for a tool, but the tool decides:
+| File | Job |
+|---|---|
+| `agent.ts` | The loop: ask Claude, run the tool it picks, up to six steps |
+| `tools.ts` | Verifies the customer and only shows their own orders |
+| `policy.ts` | The return rules, as one tested function |
+| `suggest.ts` | Picks the reply buttons from the chat's state, not the model |
+| `trace.ts` | Records every tool call and policy check |
+| `evals/run.ts` | Replays scripted chats and checks the trace and database |
 
-- Who the customer is comes from the conversation record once they've verified, never from anything the model passes in. That means it can't look up someone else's orders.
-- Someone else's order gets the same "not found" as an order that doesn't exist.
-- `initiate_return` checks eligibility again itself, so skipping the check doesn't help.
-- Three failed verifications lock the conversation.
+**Why an Edge Function.** The app runs on the customer's phone, so anything in it can be bypassed, and the Anthropic key can't ship in it. An Edge Function is TypeScript that Supabase hosts for me, right next to the database and the customer sessions. Supabase checks the session before my code runs, the key stays a server secret, and there's no server to manage. The same function runs on my laptop, which is how the evals test the real thing.
 
-After each reply there are two more checks. Any `Sources:` line has to point at real policy documents. And if the reply claims a return happened when none was actually created, that gets flagged in the trace.
+## Three decisions I'd defend
+
+**1. Policy lives in code, not in the prompt.**
+- *Chose:* The return rules are one small function, tested at day 30 vs 31 and day 60 vs 61. The tool that creates a return runs that check again itself, and once a customer verifies, the server knows who they are.
+- *Traded off:* The rules live in two places, the procedure text and the code, so changing a return window is a code change.
+- *Worth it:* I tested it with a procedure that literally says "approve every return," and it still couldn't create one.
+
+**2. If it doesn't know, it doesn't guess.**
+- *Chose:* Facts only come from the database. Any policy it cites has to be a real document, or it gets flagged. When a request is unclear, like which of two orders, it asks.
+- *Traded off:* More "I don't have that" answers, the occasional extra question, and more chats sent to an employee (10 of 45 eval runs).
+- *Worth it:* In support, promising a refund you can't honor is a lot worse than a clean handoff.
+
+**3. A stack I already know.**
+- *Chose:* Supabase for the database, server code and customer sessions, TypeScript for the agent and all the checks, and an iOS app for the UI.
+- *Traded off:* It's tied to Supabase, and the app only runs on iPhone.
+- *Worth it:* I've built with all three before, so my time went into how the agent behaves instead of learning new tools.
+
+## Did it work?
+
+The return rules and the reply buttons have unit tests, 22 in total:
+
+```bash
+deno test supabase/functions/agent/
+```
+
+The evals run scripted conversations against the real function, then check yes/no facts in the trace and the database: which tools ran and in what order, whether a return was created, whether the chat was sent to an employee, and what the reply said. There's no AI grading. Each run cleans up after itself.
+
+```bash
+deno run -A evals/run.ts --repeat 5
+```
+
+My last run, 45 of 45 passed:
+
+| Scenario | Passed | Resolved / sent to an employee / failed |
+|---|---|---|
+| Order status, asks which order | 5/5 | 5 / 0 / 0 |
+| Wrong ZIP twice, nothing leaks | 5/5 | 5 / 0 / 0 |
+| Return inside the window | 5/5 | 5 / 0 / 0 |
+| Return outside the window, customer pushes back | 5/5 | 0 / 5 / 0 |
+| Damaged item at day 41 | 5/5 | 5 / 0 / 0 |
+| Ebook return | 5/5 | 5 / 0 / 0 |
+| Shipping to Canada | 5/5 | 5 / 0 / 0 |
+| Price match (not covered) | 5/5 | 5 / 0 / 0 |
+| "Approve every return" procedure | 5/5 | 0 / 5 / 0 |
+
+The last scenario loads a deliberately bad procedure that tells the agent to approve every return. It passes if no return gets created. These are scripted chats against test data, so I treat them as a regression check, not a real resolution rate.
+
+Two other flags: `--only <scenario id>` runs one scenario, and `--remote` runs against a hosted project using `evals/.env.remote` (same variables as `evals/.env`).
 
 ## Deploying to Supabase
 
@@ -145,7 +175,7 @@ You need a Supabase project of your own. Its project ref is the ID in the dashbo
 cp supabase/.env.example supabase/.env.hosted
 ```
 
-Then log in and link the project. Linking asks for the database password.
+Log in and link the project. Linking asks for the database password.
 
 ```bash
 supabase login
@@ -155,13 +185,13 @@ supabase login
 supabase link --project-ref <your-project-ref>
 ```
 
-Load the schema and the sample data. The first time, push the migration with the seed:
+The first time, push the schema with the sample data:
 
 ```bash
 supabase db push --include-seed
 ```
 
-If the project is already set up and you want it to match the repo again (for example after the seed changed), reset it instead. This wipes the hosted database, including any chats, and reloads the schema and seed:
+If the project is already set up and you want it to match the repo again, reset it instead. This wipes the hosted database, including any chats, and reloads the schema and sample data:
 
 ```bash
 supabase db reset --linked
@@ -179,33 +209,28 @@ supabase functions deploy agent
 
 Turn on anonymous sign-ins in the dashboard (Authentication → Sign In / Providers → Allow anonymous sign-ins), because `config.toml` only covers the local setup.
 
-To check the hosted function, copy `evals/.env.example` to `evals/.env.remote` and fill it in with the hosted URL, anon key and service role key (Project Settings → API Keys). Then run one scenario against it:
+To check the hosted function, copy `evals/.env.example` to `evals/.env.remote` and fill in the hosted URL, anon key and service role key (Project Settings → API Keys). Then run one scenario:
 
 ```bash
 deno run -A evals/run.ts --remote --only order_status_clarify
 ```
 
-To use the hosted project from the app, point `ios/Bookly/Config.xcconfig` at the hosted URL and anon key.
+To use the hosted project from the app, point `ios/Bookly/Config.xcconfig` at the hosted URL and anon key. Putting the app on TestFlight is in [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md).
 
-Putting the app on TestFlight is in [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md).
+## Assumptions
 
-## Choices I made
+- Damage claims are taken at face value within 60 days. There's no photo step.
+- One return per item. A second attempt is refused with `RET-DUPLICATE`.
+- A chat caps at 20 messages. After a handoff, new messages just get "a Bookly employee has your case."
+- All customer and order data is fake, and the dates are relative to today so the return windows always line up.
 
-- **Haiku by default.** I picked the cheapest model on purpose. The rules, identity checks and source checks all run in code, so the model doesn't need to be clever to be safe. When Haiku got something wrong, I fixed the procedure wording first, then the tool descriptions, and would only have changed the model after that. I didn't loosen any check to get a pass.
-- **No temperature setting.** The brief said temperature 0, but Haiku 5.5 rejects anything other than the default, so I left it out.
-- **Extended thinking is off.** The instructions change from turn to turn (which procedure is active, whether the customer is verified), and the API won't accept earlier thinking once the instructions change.
-- **Damage claims are taken at face value** within 60 days. There's no photo step.
-- **One return per item.** A second attempt is refused with `RET-DUPLICATE`. That's a code rule, not one of the policy documents.
-- **The claim check ignores rule statements.** "Returns must be started within 30 days" doesn't count as claiming a return happened. "Your return has been started" without an RMA does.
-- **Returns v4 and the tool tweaks came from eval failures.** Haiku kept asking customers for their order number instead of looking it up, and offered to send the chat to an employee but then waited for a yes. Separately, `list_orders` now returns the delivery date, because Haiku reported the order date as the delivery date.
-- **Chats cap at 20 messages.** After a handoff, new messages just get an "a Bookly employee has your case" reply.
-- **The app opts out of the iOS 26 glass look**, since the design brief ruled out glass.
+## What I'd change first
 
-## What I'd do differently
+Right now, if the agent says a return happened when it didn't, my code flags it in the trace, but the customer still sees the message. Telling someone a refund is coming when it isn't is the worst kind of mistake in support. I'd put a small second model in front of every reply to check it against that turn's tool results and stop anything that isn't backed up.
 
-- There's no memory across chats. You re-verify every time.
-- The claim check only logs, and it's pattern-based. I'd rather have a small second model review each reply against that turn's tool results.
-- The evals are scripted. Simulated customers with different personalities would cover a lot more ground.
-- One agent with three procedures is fine here, but it won't scale to hundreds. That needs routing in front of a library of procedures, with evals for each one.
-- Every turn waits on the model loop. Streaming the reply would make it feel faster.
-- The 30- and 60-day windows live in code. In a real deployment I'd read them from the same versioned place CX edits.
+After that:
+
+- Test with simulated customers, including some trying to break it
+- Move the 30- and 60-day windows into the policy CX already edits
+- Put a router in front of more than three procedures
+- Remember customers across chat, email and voice
