@@ -1,22 +1,10 @@
 # Bookly support agent
 
-This is my take-home for the Solutions Engineer role. Bookly is a made-up online bookstore, and this is its support agent. It can tell you where an order is, start a return (or say no to one), and answer questions about shipping, refunds and accounts.
-
-## The idea: resolve it, and prove it
-
-A good support agent doesn't just answer questions. It fixes the problem, and you can see how it got there.
-
-So I put deterministic checks first. The model suggests the next step, but my code provides the guardrails:
-
-- **Code decides.** The model can only ask for a tool. The TypeScript tool checks who the customer is, whose orders they can see, and whether a return is in policy before anything happens.
-- **Nothing guessed.** Facts come only from tool results, any policy it cites has to exist, and an unclear request gets a question.
-- **Everything audited.** Each tool call and policy check goes into a trace, with the rule that made the call.
-
-![Chat with the trace turned on](docs/screenshots/chat-trace.png)
+This example support agent can tell you where an order is, start a return (or say no to one), and answer questions about shipping, refunds and accounts.
 
 ## Setting it up
 
-The agent runs in the cloud: a Supabase project holds the database and the Edge Function, and the function calls Claude through the Anthropic API. Nothing has to run on your Mac except Xcode. (If you'd rather run everything locally with Docker, that's at the end.)
+The agent runs in the cloud: a Supabase project holds the database and Edge Function, and the function calls Claude through the Anthropic API. Nothing has to run on your Mac except Xcode.
 
 You need:
 
@@ -52,9 +40,9 @@ cp supabase/.env.example supabase/.env.hosted
 
 This file is git-ignored. It only ever goes to Supabase as function secrets.
 
-Every key lives in a git-ignored file, and each one has an example on GitHub with `YOUR_..._HERE` placeholders:
+Every key in my demo lives in a git-ignored file, and each one has an example on GitHub with `YOUR_..._HERE` placeholders:
 
-| Copy this example | To | What goes in it | Where to find it |
+| Copy this example | FILE LOCATION | What goes in it | Where to find it |
 |---|---|---|---|
 | `supabase/.env.example` | `supabase/.env.hosted` | Your Anthropic API key | console.anthropic.com → API Keys |
 | `ios/Bookly/Config.example.xcconfig` | `ios/Bookly/Config.xcconfig` | Your project URL and anon key (step 5) | Supabase → Project Settings → API Keys |
@@ -90,7 +78,7 @@ supabase secrets set --env-file supabase/.env.hosted
 supabase functions deploy agent --use-api
 ```
 
-`--use-api` builds the function on Supabase's side, so you don't need Docker.
+`--use-api` builds the function on Supabase's side (the cloud), so you don't need Docker.
 
 ### 5. Run the iPhone app
 
@@ -111,9 +99,8 @@ Only the URL and the anon key go in the app, never the service role or Anthropic
 Then open `ios/Bookly/Bookly.xcodeproj` and hit Run:
 
 - **Simulator:** pick any iPhone simulator.
-- **Your iPhone:** plug it in, turn on Developer Mode (Settings → Privacy & Security), pick your team under Signing & Capabilities, and change the bundle ID from `com.example.bookly` to one of your own. A free Apple account works.
 
-The first message can take a few seconds while the function warms up. After that it's quick.
+The first message can take a few seconds while the function warms up (I usually lead with "Hello" and then press "New Chat"). After that it's quick.
 
 ### 6. Check your setup
 
@@ -147,8 +134,7 @@ Another test customer: Daniel Okafor, `daniel.okafor@example.com` / `60614`. He 
 
 ## How it's built
 
-| Part | Language | What it does |
-|---|---|---|
+**| Part | Language | What it does |**
 | iPhone app | Swift, SwiftUI | The UI. No login: tap a question or type. |
 | Supabase Edge Function | TypeScript | The orchestration: the agent loop in `agent.ts`. Calls the Anthropic Messages API directly with `fetch`. The prompt is a few base rules plus the active plain-English procedure. |
 | Tools | TypeScript | Who the customer is, whose orders they can see, what's returnable. |
@@ -193,7 +179,7 @@ All of the agent's logic is TypeScript. Swift is only the UI, and SQL sets up th
 | `prompts.ts` | The base rules and the system prompt |
 | `tools.ts` | The tools, and the identity, ownership and policy checks |
 | `policy.ts` | The return rules, as one tested function |
-| `suggest.ts` | Picks the reply buttons from the chat's state, not the model |
+| `suggest.ts` | Picks the reply buttons from the chat's state |
 | `trace.ts` | Records every tool call and policy check |
 | `types.ts` | Shared types |
 | `policy_test.ts`, `suggest_test.ts` | Unit tests |
@@ -215,17 +201,7 @@ All of the agent's logic is TypeScript. Swift is only the UI, and SQL sets up th
 
 **Why an Edge Function.** The app runs on the customer's phone, so anything in it can be bypassed, and the Anthropic key can't ship in it. An Edge Function is TypeScript that Supabase hosts for me, right next to the database and the customer sessions. Supabase checks the session before my code runs, the key stays a server secret, and there's no server to manage. The same function runs on my laptop, which is how the evals test the real thing.
 
-## Four key decisions
-
-**1. Put the policy in code, not in the prompt.** A prompt can be talked around. A tested function can't. The return rules are one small function, tested at day 30 vs 31 and day 60 vs 61, and the tool that creates a return checks the rule again itself. Once a customer verifies, the server knows who they are, so the agent can only see their orders. I tested it with a procedure that literally says "approve every return," and it still couldn't create one. Keeping the rules in two places, the procedure and the code, is a small price for that.
-
-**2. Answer from data, or ask. Never guess.** Every fact comes from a tool result, any policy it cites has to be a real document, and an unclear request, like which of two orders, gets a question. That sends more chats to an employee (5 of 45 eval runs), but in support, a refund promise you can't keep costs far more than a clean handoff.
-
-**3. Make it feel like texting.** No login, a bookworm with some personality, and a chat that looks like a text thread. When the agent asks something with obvious answers, like which order or why you're returning a book, buttons show up under the reply. Code picks them from the chat's state, not the model, so they never offer something the rules don't allow. Typing always still works.
-
-**4. Build on a stack I already know.** I've shipped with Supabase, TypeScript and iOS, so my time went into how the agent behaves, not into setup. It ties this prototype to Supabase and iPhone, but the logic is plain TypeScript and the rules don't depend on either.
-
-## Did it work?
+## EVALS
 
 The return rules and the reply buttons have unit tests, 22 in total:
 
@@ -271,43 +247,9 @@ delete from conversations;
 
 The customers, orders, policies, procedures and the latest eval result stay. In the app, start a new chat from the **⋯** menu.
 
-## Running it locally instead
-
-Everything also runs on your Mac with Docker (I used OrbStack). Keep a few GB of disk free, because the Supabase images are big.
-
-1. Copy the secrets file, add your Anthropic key, and set `ALLOW_REDTEAM=true`. That lets the evals load the "approve every return" test procedure locally.
-   ```bash
-   cp supabase/.env.example supabase/.env
-   ```
-2. Start the local stack. This loads the schema and sample data.
-   ```bash
-   supabase start
-   ```
-3. Start the agent, and leave it running in its own terminal:
-   ```bash
-   supabase functions serve agent --env-file supabase/.env
-   ```
-4. In `ios/Bookly/Config.xcconfig`, set `SUPABASE_URL = http:/$()/127.0.0.1:54321` and the anon key from `supabase status`. That works in the simulator. On a real iPhone, use your Mac's local name instead (like `http:/$()/Your-Mac.local:54321`), keep the phone on the same Wi-Fi, and tap Allow when the app asks to find devices on your local network.
-5. For the evals, copy `API_URL`, `ANON_KEY` and `SERVICE_ROLE_KEY` from `supabase status -o env` into `evals/.env`, then run `deno run -A evals/run.ts --repeat 5`.
-
-To reset the local data, run `supabase db reset`.
-
-Putting the app on TestFlight is in [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md).
-
 ## Assumptions
 
 - Damage claims are taken at face value within 60 days. There's no photo step.
 - One return per item. A second attempt is refused with `RET-DUPLICATE`.
 - A chat caps at 20 messages. After a handoff, new messages just get "a Bookly employee has your case."
 - All customer and order data is fake, and the dates are relative to today so the return windows always line up.
-
-## What I'd change first
-
-Right now, if the agent says a return happened when it didn't, my code flags it in the trace, but the customer still sees the message. Telling someone a refund is coming when it isn't is the worst kind of mistake in support. I'd put a small second model in front of every reply to check it against that turn's tool results and stop anything that isn't backed up.
-
-After that:
-
-- Test with simulated customers, including some trying to break it
-- Move the 30- and 60-day windows into the policy CX already edits
-- Put a router in front of more than three procedures
-- Remember customers across chat, email and voice
