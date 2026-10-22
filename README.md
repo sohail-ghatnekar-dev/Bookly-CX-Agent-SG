@@ -14,53 +14,104 @@ So I put deterministic checks first. The model suggests the next step, but my co
 
 ![Chat with the trace turned on](docs/screenshots/chat-trace.png)
 
-## Running it locally
+## Setting it up
+
+The agent runs in the cloud: a Supabase project holds the database and the Edge Function, and the function calls Claude through the Anthropic API. Nothing has to run on your Mac except Xcode. (If you'd rather run everything locally with Docker, that's at the end.)
 
 You need:
 
-- Docker. I used OrbStack on a Mac. Keep a few GB of disk free, because the Supabase images are big.
-- Supabase CLI 2.121 or newer
-- Deno 2
-- Xcode 26 for the iPhone app
 - An Anthropic API key
+- A Supabase account (the free plan is enough)
+- The Supabase CLI, 2.121 or newer (`brew install supabase/tap/supabase`)
+- Deno 2, for the tests and evals (`brew install deno`)
+- Xcode 26, for the iPhone app
 
-**1. Add your key.** Copy the example env file and put your Anthropic key in it:
+### 1. Get a Claude API key
+
+1. Go to [console.anthropic.com](https://console.anthropic.com) and sign in.
+2. Add some credit under **Billing**.
+3. Go to **API Keys**, click **Create Key**, and copy it.
+
+The agent uses Claude Haiku 5.5 (`claude-haiku-5-5`). You can change that with `ANTHROPIC_MODEL` in the next step.
+
+### 2. Create a Supabase project
+
+1. Go to [supabase.com/dashboard](https://supabase.com/dashboard) and click **New project**.
+2. Give it a name, set a database password (save it, you'll need it once below), and pick a region.
+3. Once it's ready, note the **project ref**. It's the ID in the dashboard URL (`/project/<project-ref>`).
+4. Go to **Authentication → Sign In / Providers**, turn on **Allow anonymous sign-ins**, and save. Customers never log in, so the app signs them in anonymously.
+5. Go to **Authentication → Rate Limits** and raise the anonymous sign-ins limit to 200 an hour. The evals sign in as a new customer on every run, and the default of 30 an hour runs out partway through.
+
+### 3. Add your keys
+
+Copy the example secrets file, then put your Anthropic key in it and set `ALLOW_REDTEAM=false`:
 
 ```bash
-cp supabase/.env.example supabase/.env
+cp supabase/.env.example supabase/.env.hosted
 ```
 
-**2. Start Supabase.** This starts the local database, auth and functions runtime, and loads the schema and sample data:
+This file is git-ignored. It only ever goes to Supabase as function secrets.
+
+### 4. Deploy
+
+Log in and link this folder to your project. Linking asks for the database password from step 2.
 
 ```bash
-supabase start
+supabase login
 ```
-
-**3. Set up the eval env file.** Run `supabase status -o env`, then copy `API_URL`, `ANON_KEY` and `SERVICE_ROLE_KEY` into `evals/.env`, using `evals/.env.example` as the template.
-
-**4. Check your setup.** This makes sure every file and variable is in place and that nothing secret would get committed. It never prints the values.
 
 ```bash
-make doctor
+supabase link --project-ref <your-project-ref>
 ```
 
-**5. Start the agent.** Leave this running in its own terminal:
+Create the tables and load the sample data:
 
 ```bash
-supabase functions serve agent --env-file supabase/.env
+supabase db push --include-seed
 ```
 
-**6. Run the iPhone app.** Copy the config template:
+Upload the secrets and deploy the agent:
+
+```bash
+supabase secrets set --env-file supabase/.env.hosted
+```
+
+```bash
+supabase functions deploy agent --use-api
+```
+
+`--use-api` builds the function on Supabase's side, so you don't need Docker.
+
+### 5. Run the iPhone app
+
+Copy the app's config template:
 
 ```bash
 cp ios/Bookly/Config.example.xcconfig ios/Bookly/Config.xcconfig
 ```
 
-Set `SUPABASE_URL = http:/$()/127.0.0.1:54321` (the `$()` is there because xcconfig treats `//` as a comment) and `SUPABASE_ANON_KEY` to the anon key from `supabase status`. Then open `ios/Bookly/Bookly.xcodeproj`, pick an iPhone simulator, and hit Run.
+Set `SUPABASE_URL = https:/$()/<your-project-ref>.supabase.co` (the `$()` is there because xcconfig files treat `//` as a comment). Set `SUPABASE_ANON_KEY` to your project's anon key, from **Project Settings → API Keys** in the dashboard, or from:
 
-To run it on your own iPhone against your Mac instead, use your Mac's local network name, like `SUPABASE_URL = http:/$()/Your-Mac.local:54321` (System Settings → General → Sharing shows it). The phone and Mac need to be on the same Wi-Fi, and the first time, tap Allow when the app asks to find devices on your local network.
+```bash
+supabase projects api-keys --project-ref <your-project-ref>
+```
 
-The first message after you start the function can take a few seconds while it warms up.
+Only the URL and the anon key go in the app, never the service role or Anthropic key.
+
+Then open `ios/Bookly/Bookly.xcodeproj` and hit Run:
+
+- **Simulator:** pick any iPhone simulator.
+- **Your iPhone:** plug it in, turn on Developer Mode (Settings → Privacy & Security), pick your team under Signing & Capabilities, and change the bundle ID from `com.example.bookly` to one of your own. A free Apple account works.
+
+The first message can take a few seconds while the function warms up. After that it's quick.
+
+### 6. Check your setup
+
+This makes sure every file and variable is in place and that nothing secret would get committed. It never prints the values.
+
+```bash
+make doctor
+```
 
 ## Things to try
 
@@ -174,8 +225,10 @@ deno test supabase/functions/agent/
 
 The evals run scripted conversations against the real function, then check yes/no facts in the trace and the database: which tools ran and in what order, whether a return was created, whether the chat was sent to an employee, and what the reply said. There's no AI grading. Each run cleans up after itself.
 
+To run them against your cloud project, copy `evals/.env.example` to `evals/.env.remote` and fill in your project URL, anon key and service role key (Project Settings → API Keys). The service role key lets the runner check the database and clean up. Keep it out of the app and out of git. Then:
+
 ```bash
-deno run -A evals/run.ts --repeat 5
+deno run -A evals/run.ts --remote --repeat 5
 ```
 
 My last run, against the deployed cloud agent, 45 of 45 passed:
@@ -194,59 +247,42 @@ My last run, against the deployed cloud agent, 45 of 45 passed:
 
 The last scenario asks for a return that's out of policy, and passes if no return gets created. Run locally, it also loads a deliberately bad procedure that tells the agent to approve every return, and the return still gets blocked. The cloud keeps that test procedure switched off (`ALLOW_REDTEAM=false`), so there it just runs the normal returns procedure. These are scripted chats against test data, so I treat them as a regression check, not a real resolution rate.
 
-Two other flags: `--only <scenario id>` runs one scenario, and `--remote` runs against a hosted project using `evals/.env.remote` (same variables as `evals/.env`).
+Add `--only <scenario id>` to run one scenario. The latest result shows up on the app's Procedures screen.
 
-## Deploying to Supabase
+## Resetting the demo data
 
-You need a Supabase project of your own. Its project ref is the ID in the dashboard URL. First make `supabase/.env.hosted` from the example, with your Anthropic key and `ALLOW_REDTEAM=false`, and run `make doctor` to check it.
+A return can only be started once per item, so after a demo run, clear the chats and returns in the dashboard's **SQL Editor**:
 
-```bash
-cp supabase/.env.example supabase/.env.hosted
+```sql
+delete from returns;
+delete from escalations;
+delete from conversations;
 ```
 
-Log in and link the project. Linking asks for the database password.
+The customers, orders, policies, procedures and the latest eval result stay. In the app, start a new chat from the **⋯** menu.
 
-```bash
-supabase login
-```
+## Running it locally instead
 
-```bash
-supabase link --project-ref <your-project-ref>
-```
+Everything also runs on your Mac with Docker (I used OrbStack). Keep a few GB of disk free, because the Supabase images are big.
 
-The first time, push the schema with the sample data:
+1. Copy the secrets file and add your Anthropic key. Keep `ALLOW_REDTEAM=true` locally, which lets the evals load the "approve every return" test procedure.
+   ```bash
+   cp supabase/.env.example supabase/.env
+   ```
+2. Start the local stack. This loads the schema and sample data.
+   ```bash
+   supabase start
+   ```
+3. Start the agent, and leave it running in its own terminal:
+   ```bash
+   supabase functions serve agent --env-file supabase/.env
+   ```
+4. In `ios/Bookly/Config.xcconfig`, set `SUPABASE_URL = http:/$()/127.0.0.1:54321` and the anon key from `supabase status`. That works in the simulator. On a real iPhone, use your Mac's local name instead (like `http:/$()/Your-Mac.local:54321`), keep the phone on the same Wi-Fi, and tap Allow when the app asks to find devices on your local network.
+5. For the evals, copy `API_URL`, `ANON_KEY` and `SERVICE_ROLE_KEY` from `supabase status -o env` into `evals/.env`, then run `deno run -A evals/run.ts --repeat 5`.
 
-```bash
-supabase db push --include-seed
-```
+To reset the local data, run `supabase db reset`.
 
-If the project is already set up and you want it to match the repo again, reset it instead. This wipes the hosted database, including any chats, and reloads the schema and sample data:
-
-```bash
-supabase db reset --linked
-```
-
-Set the function's secrets and deploy it:
-
-```bash
-supabase secrets set --env-file supabase/.env.hosted
-```
-
-```bash
-supabase functions deploy agent --use-api
-```
-
-`--use-api` builds the function on Supabase's side, so you don't need Docker running to deploy.
-
-Turn on anonymous sign-ins in the dashboard (Authentication → Sign In / Providers → Allow anonymous sign-ins), because `config.toml` only covers the local setup.
-
-To check the hosted function, copy `evals/.env.example` to `evals/.env.remote` and fill in the hosted URL, anon key and service role key (Project Settings → API Keys). Then run one scenario:
-
-```bash
-deno run -A evals/run.ts --remote --only order_status_clarify
-```
-
-To use the hosted project from the app, point `ios/Bookly/Config.xcconfig` at the hosted URL and anon key. Putting the app on TestFlight is in [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md).
+Putting the app on TestFlight is in [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md).
 
 ## Assumptions
 

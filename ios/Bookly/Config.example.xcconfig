@@ -1,5 +1,6 @@
 // Copy to Config.xcconfig (gitignored) and fill in. URL and anon key only: never a service-role or Anthropic key.
 // xcconfig treats "//" as a comment, so write the scheme as https:/$()/ — the empty $() keeps both slashes.
-// Local stack: SUPABASE_URL = http:/$()/127.0.0.1:54321 and the anon key from `supabase status`.
+// Cloud: your project URL and anon key from Project Settings → API Keys.
+// Local stack instead: SUPABASE_URL = http:/$()/127.0.0.1:54321 and the anon key from `supabase status`.
 SUPABASE_URL = https:/$()/your-project-ref.supabase.co
 SUPABASE_ANON_KEY = your-anon-key
