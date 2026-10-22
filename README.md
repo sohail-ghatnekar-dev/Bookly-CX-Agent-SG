@@ -233,8 +233,10 @@ supabase secrets set --env-file supabase/.env.hosted
 ```
 
 ```bash
-supabase functions deploy agent
+supabase functions deploy agent --use-api
 ```
+
+`--use-api` builds the function on Supabase's side, so you don't need Docker running to deploy.
 
 Turn on anonymous sign-ins in the dashboard (Authentication → Sign In / Providers → Allow anonymous sign-ins), because `config.toml` only covers the local setup.
 
