@@ -1,4 +1,4 @@
-// Anthropic Messages API over plain fetch. No SDK.
+// Calls Claude Haiku 5.5 (claude-haiku-5-5, or ANTHROPIC_MODEL) through the Anthropic Messages API over plain fetch. No SDK.
 import type { ContentBlock, Message } from "./types.ts";
 
 const API_URL = "https://api.anthropic.com/v1/messages";

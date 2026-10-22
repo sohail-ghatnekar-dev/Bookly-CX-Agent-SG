@@ -126,7 +126,7 @@ All of the agent's logic is TypeScript. Swift is only the UI, and SQL sets up th
 |---|---|
 | `index.ts` | The endpoint the app calls. Checks the session and that the chat is yours. |
 | `agent.ts` | The agent loop: ask Claude, run the tool it picks, up to six steps. Checks sources and claims after. |
-| `anthropic.ts` | Calls the Anthropic Messages API with `fetch`, with retries |
+| `anthropic.ts` | Calls Claude Haiku 5.5 through the Anthropic Messages API with `fetch`, with retries |
 | `prompts.ts` | The base rules and the system prompt |
 | `tools.ts` | The tools, and the identity, ownership and policy checks |
 | `policy.ts` | The return rules, as one tested function |
