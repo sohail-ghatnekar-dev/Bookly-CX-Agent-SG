@@ -150,9 +150,18 @@ struct ChatView: View {
     }
 
     private func submit() {
-        let text = draft
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Leave the text in the box while a reply is still coming, so it isn't lost.
+        guard !text.isEmpty, !model.isSending else { return }
         draft = ""
         Task { await model.send(text) }
+        // The keyboard can commit a pending autocorrection just after the box is cleared, which puts
+        // the sent text back. Clear it again once that has happened, unless the customer has typed
+        // something new.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(150))
+            if draft.trimmingCharacters(in: .whitespacesAndNewlines) == text { draft = "" }
+        }
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
