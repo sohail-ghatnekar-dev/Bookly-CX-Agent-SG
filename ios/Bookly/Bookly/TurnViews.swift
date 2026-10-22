@@ -1,3 +1,4 @@
+// Pieces of the chat: message bubbles, trace lines, the handoff card, suggestion buttons, and errors.
 import SwiftUI
 
 struct TurnView: View {

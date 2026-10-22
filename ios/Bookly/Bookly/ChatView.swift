@@ -1,3 +1,4 @@
+// The chat screen: header with the bookworm, welcome screen, messages, suggestion buttons, and the input bar.
 import SwiftUI
 
 struct ChatView: View {

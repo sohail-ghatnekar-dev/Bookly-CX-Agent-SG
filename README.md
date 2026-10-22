@@ -103,16 +103,52 @@ iPhone app ── signs in anonymously ──▶ Supabase Auth
                              Postgres: orders, returns, chats, trace, procedures
 ```
 
-All of the logic is TypeScript. The agent is in `supabase/functions/agent/` and the evals are in `evals/`. Each file has one job:
+### Where the code lives
 
-| File | Job |
+All of the agent's logic is TypeScript. Swift is only the UI, and SQL sets up the database. The Supabase files stay under `supabase/` because that's where the Supabase CLI looks for them.
+
+**Swift: the iPhone app** (`ios/Bookly/Bookly/`)
+
+| File | What it does |
 |---|---|
-| `agent.ts` | The loop: ask Claude, run the tool it picks, up to six steps |
-| `tools.ts` | Verifies the customer and only shows their own orders |
+| `BooklyApp.swift` | App entry point |
+| `ChatView.swift` | The chat screen: header, welcome screen, messages, suggestion buttons, input bar |
+| `TurnViews.swift` | Message bubbles, trace lines, the handoff card, suggestion buttons |
+| `Bookworm.swift` | The bookworm avatar and the "checking the archives" animation |
+| `ChatModel.swift` | Chat state: sends messages, restores the last chat, recovers from an expired session |
+| `Backend.swift` | Talks to Supabase: anonymous sign-in, calls the agent, reads history and procedures |
+| `ProceduresView.swift` | The Procedures screen, with version history and the latest eval result |
+| `Theme.swift` | Colors and fonts |
+
+**TypeScript: the Supabase Edge Function** (`supabase/functions/agent/`)
+
+| File | What it does |
+|---|---|
+| `index.ts` | The endpoint the app calls. Checks the session and that the chat is yours. |
+| `agent.ts` | The agent loop: ask Claude, run the tool it picks, up to six steps. Checks sources and claims after. |
+| `anthropic.ts` | Calls the Anthropic Messages API with `fetch`, with retries |
+| `prompts.ts` | The base rules and the system prompt |
+| `tools.ts` | The tools, and the identity, ownership and policy checks |
 | `policy.ts` | The return rules, as one tested function |
 | `suggest.ts` | Picks the reply buttons from the chat's state, not the model |
 | `trace.ts` | Records every tool call and policy check |
-| `evals/run.ts` | Replays scripted chats and checks the trace and database |
+| `types.ts` | Shared types |
+| `policy_test.ts`, `suggest_test.ts` | Unit tests |
+
+**TypeScript: the evals** (`evals/`)
+
+| File | What it does |
+|---|---|
+| `run.ts` | Replays scripted chats against the function and checks the trace and database |
+| `scenarios.json` | The nine scripted conversations and what each one has to prove |
+
+**SQL: the Supabase database** (`supabase/`)
+
+| File | What it does |
+|---|---|
+| `migrations/0001_schema.sql` | Creates the tables (customers, orders, chats, trace, procedures, returns, handoffs, eval runs) and the row-level security rules |
+| `seed.sql` | Fills them with test data: two customers, their orders, the policy documents, and every version of the procedures |
+| `config.toml` | Local Supabase settings, like anonymous sign-ins and the function's session check |
 
 **Why an Edge Function.** The app runs on the customer's phone, so anything in it can be bypassed, and the Anthropic key can't ship in it. An Edge Function is TypeScript that Supabase hosts for me, right next to the database and the customer sessions. Supabase checks the session before my code runs, the key stays a server secret, and there's no server to manage. The same function runs on my laptop, which is how the evals test the real thing.
 

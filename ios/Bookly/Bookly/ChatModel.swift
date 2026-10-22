@@ -1,3 +1,4 @@
+// Chat state: sends messages, restores the last chat, and recovers when a chat or session has expired.
 import Foundation
 import Observation
 

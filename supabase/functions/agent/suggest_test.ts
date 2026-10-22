@@ -1,3 +1,4 @@
+// Unit tests for the reply buttons: which buttons show up for which chat state.
 import { assertEquals } from "jsr:@std/assert@1";
 import { suggestReplies, type SuggestionEvent, type SuggestionInput } from "./suggest.ts";
 

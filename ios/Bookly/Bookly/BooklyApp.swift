@@ -1,3 +1,4 @@
+// App entry point: one navigation stack with the chat screen.
 import SwiftUI
 
 @main

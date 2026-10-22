@@ -1,3 +1,4 @@
+// Unit tests for the return rules: day 30 vs 31, day 60 vs 61, ebooks, undelivered orders, duplicates.
 import { assertEquals } from "jsr:@std/assert@1";
 import { evaluateReturn, type ReturnInput } from "./policy.ts";
 

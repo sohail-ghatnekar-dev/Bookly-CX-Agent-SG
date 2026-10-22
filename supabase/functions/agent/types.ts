@@ -1,3 +1,4 @@
+// Shared shapes: trace events, the conversation record, Anthropic message blocks, and the tool context.
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import type { Trace } from "./trace.ts";
 

@@ -1,3 +1,4 @@
+// The trace: every tool call and policy check in a turn, saved to Postgres and shown in the app.
 import type { TraceEvent } from "./types.ts";
 
 export type NewEvent = Omit<TraceEvent, "seq" | "ms" | "input" | "output" | "rule_id"> &

@@ -67,7 +67,7 @@ insert into procedures (name, version, is_active, is_redteam, created_at, body) 
 6. If not eligible, explain the rule in plain words and offer what is allowed. For example, if a change-of-mind return is past 30 days, ask whether the item arrived damaged.
 7. If the customer pushes back after a denial, do not negotiate or look for workarounds. Offer to send the chat to a Bookly employee and call escalate_to_human with everything learned.$$),
 
--- v4, from eval failures on v3: Haiku asked customers for order numbers instead of looking them up,
+-- v4, from eval failures on v3: the agent asked customers for order numbers instead of looking them up,
 -- and offered an employee after pushback but waited for a yes instead of handing off.
 ('returns', 4, true, false, now() - interval '1 hour', $$Goal: help the customer return an item, only when policy allows.
 1. Verify identity first (email and ZIP). Same rules as order status.
