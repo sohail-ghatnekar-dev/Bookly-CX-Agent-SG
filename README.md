@@ -116,13 +116,15 @@ All of the logic is TypeScript. The agent is in `supabase/functions/agent/` and 
 
 **Why an Edge Function.** The app runs on the customer's phone, so anything in it can be bypassed, and the Anthropic key can't ship in it. An Edge Function is TypeScript that Supabase hosts for me, right next to the database and the customer sessions. Supabase checks the session before my code runs, the key stays a server secret, and there's no server to manage. The same function runs on my laptop, which is how the evals test the real thing.
 
-## Three key decisions
+## Four key decisions
 
 **1. Put the policy in code, not in the prompt.** A prompt can be talked around. A tested function can't. The return rules are one small function, tested at day 30 vs 31 and day 60 vs 61, and the tool that creates a return checks the rule again itself. Once a customer verifies, the server knows who they are, so the agent can only see their orders. I tested it with a procedure that literally says "approve every return," and it still couldn't create one. Keeping the rules in two places, the procedure and the code, is a small price for that.
 
 **2. Answer from data, or ask. Never guess.** Every fact comes from a tool result, any policy it cites has to be a real document, and an unclear request, like which of two orders, gets a question. That sends more chats to an employee (10 of 45 eval runs), but in support, a refund promise you can't keep costs far more than a clean handoff.
 
-**3. Build on a stack I already know.** I've shipped with Supabase, TypeScript and iOS, so my time went into how the agent behaves, not into setup. It ties this prototype to Supabase and iPhone, but the logic is plain TypeScript and the rules don't depend on either.
+**3. Make it feel like texting.** No login, a bookworm with some personality, and a chat that looks like a text thread. When the agent asks something with obvious answers, like which order or why you're returning a book, buttons show up under the reply. Code picks them from the chat's state, not the model, so they never offer something the rules don't allow. Typing always still works.
+
+**4. Build on a stack I already know.** I've shipped with Supabase, TypeScript and iOS, so my time went into how the agent behaves, not into setup. It ties this prototype to Supabase and iPhone, but the logic is plain TypeScript and the rules don't depend on either.
 
 ## Did it work?
 
