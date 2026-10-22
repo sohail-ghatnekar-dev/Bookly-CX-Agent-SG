@@ -58,6 +58,8 @@ cp ios/Bookly/Config.example.xcconfig ios/Bookly/Config.xcconfig
 
 Set `SUPABASE_URL = http:/$()/127.0.0.1:54321` (the `$()` is there because xcconfig treats `//` as a comment) and `SUPABASE_ANON_KEY` to the anon key from `supabase status`. Then open `ios/Bookly/Bookly.xcodeproj`, pick an iPhone simulator, and hit Run.
 
+To run it on your own iPhone against your Mac instead, use your Mac's local network name, like `SUPABASE_URL = http:/$()/Your-Mac.local:54321` (System Settings → General → Sharing shows it). The phone and Mac need to be on the same Wi-Fi, and the first time, tap Allow when the app asks to find devices on your local network.
+
 The first message after you start the function can take a few seconds while it warms up.
 
 ## Things to try
