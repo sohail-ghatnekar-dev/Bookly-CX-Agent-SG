@@ -44,13 +44,23 @@ The agent uses Claude Haiku 5.5 (`claude-haiku-5-5`). You can change that with `
 
 ### 3. Add your keys
 
-Copy the example secrets file, then put your Anthropic key in it and set `ALLOW_REDTEAM=false`:
+Copy the example secrets file and replace `YOUR_ANTHROPIC_API_KEY_HERE` with your key. Leave `ALLOW_REDTEAM=false`.
 
 ```bash
 cp supabase/.env.example supabase/.env.hosted
 ```
 
 This file is git-ignored. It only ever goes to Supabase as function secrets.
+
+Every key lives in a git-ignored file, and each one has an example on GitHub with `YOUR_..._HERE` placeholders:
+
+| Copy this example | To | What goes in it | Where to find it |
+|---|---|---|---|
+| `supabase/.env.example` | `supabase/.env.hosted` | Your Anthropic API key | console.anthropic.com → API Keys |
+| `ios/Bookly/Config.example.xcconfig` | `ios/Bookly/Config.xcconfig` | Your project URL and anon key (step 5) | Supabase → Project Settings → API Keys |
+| `evals/.env.example` | `evals/.env.remote` | Project URL, anon key and service role key (only for the evals) | Supabase → Project Settings → API Keys |
+
+`make doctor` (step 6) flags any value you haven't filled in yet.
 
 ### 4. Deploy
 
@@ -265,7 +275,7 @@ The customers, orders, policies, procedures and the latest eval result stay. In 
 
 Everything also runs on your Mac with Docker (I used OrbStack). Keep a few GB of disk free, because the Supabase images are big.
 
-1. Copy the secrets file and add your Anthropic key. Keep `ALLOW_REDTEAM=true` locally, which lets the evals load the "approve every return" test procedure.
+1. Copy the secrets file, add your Anthropic key, and set `ALLOW_REDTEAM=true`. That lets the evals load the "approve every return" test procedure locally.
    ```bash
    cp supabase/.env.example supabase/.env
    ```

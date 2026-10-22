@@ -16,7 +16,10 @@ doctor:
 	has_var() { grep -qE "^[[:space:]]*$$2[[:space:]]*=[[:space:]]*[^[:space:]]" "$$1" 2>/dev/null; }; \
 	need_vars() { f=$$1; shift; \
 	  if [ ! -f "$$f" ]; then bad "$$f is missing"; return; fi; \
-	  for v in "$$@"; do if has_var "$$f" "$$v"; then ok "$$f: $$v set"; else bad "$$f: $$v missing or empty"; fi; done; }; \
+	  for v in "$$@"; do \
+	    if ! has_var "$$f" "$$v"; then bad "$$f: $$v missing or empty"; \
+	    elif grep -qE "^[[:space:]]*$$v[[:space:]]*=.*YOUR_" "$$f"; then bad "$$f: $$v is still the YOUR_..._HERE placeholder"; \
+	    else ok "$$f: $$v set"; fi; done; }; \
 	echo "Files"; \
 	for f in supabase/config.toml supabase/migrations/0001_schema.sql supabase/seed.sql; do \
 	  if [ -s "$$f" ]; then ok "$$f"; else bad "$$f is missing"; fi; done; \
