@@ -5,6 +5,9 @@ struct ChatView: View {
     @State private var model = ChatModel()
     @AppStorage("showTrace") private var showTrace = false
     @State private var draft = ""
+    @FocusState private var inputFocused: Bool
+    // Changing this swaps in a fresh message field, with nothing left over from the keyboard.
+    @State private var inputID = UUID()
     @State private var showProcedures = false
 
     private let starters = ["Where's my order?", "I'd like to return a book", "How long does shipping take?"]
@@ -80,14 +83,16 @@ struct ChatView: View {
 
     private var inputBar: some View {
         HStack(alignment: .bottom, spacing: 10) {
+            // Single-line on purpose: the multi-line field can put sent text back after it's cleared.
             TextField(
                 model.isEscalated ? "A Bookly employee has your case" : "Write a message",
-                text: $draft,
-                axis: .vertical
+                text: $draft
             )
+            .id(inputID)
+            .focused($inputFocused)
+            .submitLabel(.send)
             .font(Theme.prose)
             .foregroundStyle(Theme.ink)
-            .lineLimit(1...4)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(Theme.card, in: RoundedRectangle(cornerRadius: 18))
@@ -153,11 +158,14 @@ struct ChatView: View {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         // Leave the text in the box while a reply is still coming, so it isn't lost.
         guard !text.isEmpty, !model.isSending else { return }
+        // Drop the keyboard first so it commits any pending autocorrection now, then clear the box
+        // and swap in a fresh field so nothing can come back.
+        inputFocused = false
         draft = ""
+        inputID = UUID()
         Task { await model.send(text) }
-        // The keyboard can commit a pending autocorrection just after the box is cleared, which puts
-        // the sent text back. Clear it again once that has happened, unless the customer has typed
-        // something new.
+        // Belt and braces: if the keyboard still puts the sent text back a moment later, clear it,
+        // unless the customer has typed something new.
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(150))
             if draft.trimmingCharacters(in: .whitespacesAndNewlines) == text { draft = "" }
