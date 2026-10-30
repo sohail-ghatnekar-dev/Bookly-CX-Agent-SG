@@ -146,7 +146,8 @@ Another test customer: Daniel Okafor, `daniel.okafor@example.com` / `60614`. He 
 
 ## How it's built
 
-**| Part | Language | What it does |**
+| Part | Language | What it does |
+|---|---|---|
 | iPhone app | Swift, SwiftUI | The UI. No login: tap a question or type. |
 | Supabase Edge Function | TypeScript | The orchestration: the agent loop in `agent.ts`. Calls the Anthropic Messages API directly with `fetch`. The prompt is a few base rules plus the active plain-English procedure. |
 | Tools | TypeScript | Who the customer is, whose orders they can see, what's returnable. |
