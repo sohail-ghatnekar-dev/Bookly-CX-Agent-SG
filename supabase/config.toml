@@ -34,3 +34,6 @@ deno_version = 2
 
 [functions.agent]
 verify_jwt = true
+
+[functions.watchtower]
+verify_jwt = true

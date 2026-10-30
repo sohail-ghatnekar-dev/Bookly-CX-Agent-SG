@@ -9,6 +9,7 @@ struct ChatView: View {
     // Changing this swaps in a fresh message field, with nothing left over from the keyboard.
     @State private var inputID = UUID()
     @State private var showProcedures = false
+    @State private var showWatchtower = false
 
     private let starters = ["Where's my order?", "I'd like to return a book", "How long does shipping take?"]
 
@@ -58,6 +59,7 @@ struct ChatView: View {
         .toolbarBackground(Theme.paper, for: .navigationBar)
         .toolbar { toolbar }
         .navigationDestination(isPresented: $showProcedures) { ProceduresView() }
+        .navigationDestination(isPresented: $showWatchtower) { WatchtowerView() }
         .task { await model.load() }
     }
 
@@ -147,6 +149,7 @@ struct ChatView: View {
             Menu {
                 Button("New conversation") { model.newConversation() }
                 Button("Procedures") { showProcedures = true }
+                Button("Watchtower") { showWatchtower = true }
             } label: {
                 Image(systemName: "ellipsis.circle").foregroundStyle(Theme.ink)
             }

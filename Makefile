@@ -63,10 +63,10 @@ db:
 	supabase db reset
 
 serve:
-	supabase functions serve agent --env-file supabase/.env
+	supabase functions serve --env-file supabase/.env
 
 test:
-	deno test supabase/functions/agent/
+	deno test supabase/functions/
 
 eval:
 	deno run -A evals/run.ts $(ARGS)

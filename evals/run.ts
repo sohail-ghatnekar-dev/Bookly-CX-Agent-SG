@@ -1,5 +1,6 @@
 // Scenario evals: scripted turns against the agent function, structural assertions on the trace and DB.
-// deno run -A evals/run.ts [--repeat 5] [--only id] [--remote]
+// deno run -A evals/run.ts [--repeat 5] [--only id] [--remote] [--keep]
+// --keep leaves the chats in the database, so Watchtower has real conversations to show.
 import { parseArgs } from "jsr:@std/cli@1/parse-args";
 import { fromFileUrl } from "jsr:@std/path@1/from-file-url";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -35,7 +36,7 @@ interface Run {
 }
 
 const ROOT = fromFileUrl(new URL("..", import.meta.url));
-const args = parseArgs(Deno.args, { string: ["only", "repeat"], boolean: ["remote"] });
+const args = parseArgs(Deno.args, { string: ["only", "repeat"], boolean: ["remote", "keep"] });
 const repeat = Number(args.repeat ?? 1);
 const env = readEnv(`${ROOT}evals/${args.remote ? ".env.remote" : ".env"}`);
 const scenarios: Scenario[] = JSON.parse(await Deno.readTextFile(`${ROOT}evals/scenarios.json`))
@@ -107,8 +108,8 @@ async function runScenario(s: Scenario): Promise<Run> {
     const problem = await check(a, { trace, replies, escalated, conversationId });
     if (problem) failures.push(problem);
   }
-  if (conversationId) await cleanup(conversationId);
-  await db.auth.admin.deleteUser(auth.user!.id);
+  if (conversationId) await cleanup(conversationId, args.keep);
+  if (!args.keep) await db.auth.admin.deleteUser(auth.user!.id);
 
   const passed = failures.length === 0;
   return {
@@ -191,8 +192,9 @@ async function rows<T = unknown>(table: string, conversationId: string, select: 
 }
 
 // Keeps seed data reusable: removes the run's returns and escalations, then the conversation itself.
-async function cleanup(conversationId: string) {
-  for (const table of ["returns", "escalations", "conversations"]) {
+// With --keep, only the returns go, so the next run can return the same book; the chat stays for Watchtower.
+async function cleanup(conversationId: string, keep = false) {
+  for (const table of keep ? ["returns"] : ["returns", "escalations", "conversations"]) {
     const { error } = await db.from(table).delete().eq(table === "conversations" ? "id" : "conversation_id", conversationId);
     if (error) console.error(`cleanup ${table} failed: ${error.message}`);
   }

@@ -68,7 +68,7 @@ Create the tables and load the sample data:
 supabase db push --include-seed
 ```
 
-Upload the secrets and deploy the agent:
+Upload the secrets, then deploy the agent and the Watchtower dashboard's function:
 
 ```bash
 supabase secrets set --env-file supabase/.env.hosted
@@ -76,6 +76,10 @@ supabase secrets set --env-file supabase/.env.hosted
 
 ```bash
 supabase functions deploy agent --use-api
+```
+
+```bash
+supabase functions deploy watchtower --use-api
 ```
 
 `--use-api` builds the function on Supabase's side (the cloud), so you don't need Docker.
@@ -130,6 +134,14 @@ Tap **Trace** in the top right first. It shows a line under each reply for every
 
 ![Procedures](docs/screenshots/procedures.png)
 
+**Watchtower.** Open the **⋯** menu and tap Watchtower. This is the admin's view across every chat in the last 30 days:
+- how many chats the agent handled on its own;
+- what customers ask about;
+- how often, and why, an employee was pulled in;
+- how often each control fired, like a return blocked in code or a policy ID that doesn't exist.
+
+It shows counts only, with no customer details. Pull down to refresh. To fill it with real conversations, run the evals with `--keep` (see [Evals](#evals)).
+
 Another test customer: Daniel Okafor, `daniel.okafor@example.com` / `60614`. He has an ebook, Pachinko, which can't be returned.
 
 ## How it's built
@@ -138,6 +150,7 @@ Another test customer: Daniel Okafor, `daniel.okafor@example.com` / `60614`. He 
 | iPhone app | Swift, SwiftUI | The UI. No login: tap a question or type. |
 | Supabase Edge Function | TypeScript | The orchestration: the agent loop in `agent.ts`. Calls the Anthropic Messages API directly with `fetch`. The prompt is a few base rules plus the active plain-English procedure. |
 | Tools | TypeScript | Who the customer is, whose orders they can see, what's returnable. |
+| Watchtower | TypeScript, Swift | A second Edge Function that summarizes every chat for an admin, and the screen that shows it. |
 | Memory | SQL, in Supabase Postgres | Orders, chats, procedures and the trace. |
 
 ```
@@ -167,6 +180,7 @@ All of the agent's logic is TypeScript. Swift is only the UI, and SQL sets up th
 | `ChatModel.swift` | Chat state: sends messages, restores the last chat, recovers from an expired session |
 | `Backend.swift` | Talks to Supabase: anonymous sign-in, calls the agent, reads history and procedures |
 | `ProceduresView.swift` | The Procedures screen, with version history and the latest eval result |
+| `WatchtowerView.swift` | The Watchtower screen: chats handled, topics, handoffs, controls fired, flags |
 | `Theme.swift` | Colors and fonts |
 
 **TypeScript: the Supabase Edge Function** (`supabase/functions/agent/`)
@@ -183,6 +197,14 @@ All of the agent's logic is TypeScript. Swift is only the UI, and SQL sets up th
 | `trace.ts` | Records every tool call and policy check |
 | `types.ts` | Shared types |
 | `policy_test.ts`, `suggest_test.ts` | Unit tests |
+
+**TypeScript: the Watchtower function** (`supabase/functions/watchtower/`)
+
+| File | What it does |
+|---|---|
+| `index.ts` | The endpoint the Watchtower screen calls. Reads the last 30 days of chats with the service role and returns counts only. |
+| `stats.ts` | Turns those chats into the summary, and lists every control the agent has, even at zero |
+| `stats_test.ts` | Unit tests |
 
 **TypeScript: the evals** (`evals/`)
 
@@ -203,10 +225,10 @@ All of the agent's logic is TypeScript. Swift is only the UI, and SQL sets up th
 
 ## EVALS
 
-The return rules and the reply buttons have unit tests, 22 in total:
+The return rules, the reply buttons and the Watchtower summary have unit tests, 26 in total:
 
 ```bash
-deno test supabase/functions/agent/
+deno test supabase/functions/
 ```
 
 The evals run scripted conversations against the real function, then check yes/no facts in the trace and the database: which tools ran and in what order, whether a return was created, whether the chat was sent to an employee, and what the reply said. There's no AI grading. Each run cleans up after itself.
@@ -233,7 +255,7 @@ My last run, against the deployed cloud agent, 45 of 45 passed:
 
 The last scenario asks for a return that's out of policy, and passes if no return gets created. Run locally, it also loads a deliberately bad procedure that tells the agent to approve every return, and the return still gets blocked. The cloud keeps that test procedure switched off (`ALLOW_REDTEAM=false`), so there it just runs the normal returns procedure. These are scripted chats against test data, so I treat them as a regression check, not a real resolution rate.
 
-Add `--only <scenario id>` to run one scenario. The latest result shows up on the app's Procedures screen.
+Add `--only <scenario id>` to run one scenario. Add `--keep` to leave the chats in the database, so Watchtower has real conversations to show. It still removes the returns, so the same book can be returned again on the next run. The latest result shows up on the app's Procedures screen.
 
 ## Resetting the demo data
 
@@ -245,7 +267,7 @@ delete from escalations;
 delete from conversations;
 ```
 
-The customers, orders, policies, procedures and the latest eval result stay. In the app, start a new chat from the **⋯** menu.
+The customers, orders, policies, procedures and the latest eval result stay. This also empties Watchtower until new chats come in. In the app, start a new chat from the **⋯** menu.
 
 ## Assumptions
 

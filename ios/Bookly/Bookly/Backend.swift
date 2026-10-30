@@ -63,6 +63,50 @@ struct EvalRun: Decodable {
     let escalated: Int
 }
 
+// The Watchtower summary: counts over the last 30 days, built by the watchtower function.
+struct Watchtower: Decodable {
+    struct Count: Decodable, Hashable {
+        let key: String
+        let name: String
+        let count: Int
+    }
+    struct Control: Decodable, Hashable {
+        let key: String
+        let name: String
+        let what: String
+        let count: Int
+    }
+    struct Handoff: Decodable, Hashable {
+        let reason: String
+        let at: String
+    }
+    struct Flag: Decodable, Hashable {
+        let name: String
+        let detail: String
+        let at: String
+    }
+    struct LatestEval: Decodable {
+        let model: String
+        let total: Int
+        let passed: Int
+    }
+
+    let days: Int
+    let conversations: Int
+    let handledByAgent: Int
+    let sentToEmployee: Int
+    let avgTurns: Double
+    let returnsCreated: Int
+    let flaggedConversations: Int
+    let topics: [Count]
+    let handoffReasons: [Count]
+    let recentHandoffs: [Handoff]
+    let controls: [Control]
+    let rulesEnforced: [Count]
+    let recentFlags: [Flag]
+    let latestEval: LatestEval?
+}
+
 // A reloaded conversation: text turns only, with trace events grouped by turn.
 struct History {
     struct Turn {
@@ -207,6 +251,15 @@ enum Backend {
                 .order("ran_at", ascending: false).limit(1)
         )
         return runs.first
+    }
+
+    static func watchtower() async throws -> Watchtower {
+        try await signInIfNeeded()
+        return try await supabase.functions.invoke(
+            "watchtower",
+            options: FunctionInvokeOptions(body: [String: String]()),
+            decoder: decoder
+        )
     }
 
     private static func rows<T: Decodable>(_ query: PostgrestBuilder) async throws -> [T] {
