@@ -16,7 +16,7 @@ const env = Object.fromEntries(
 const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
 const email = (Deno.env.get("ADMIN_EMAIL") ?? prompt("Admin email:") ?? "").trim().toLowerCase();
-const password = Deno.env.get("ADMIN_PASSWORD") ?? prompt("Password (at least 12 characters):") ?? "";
+const password = Deno.env.get("ADMIN_PASSWORD") ?? readHidden("Password (at least 12 characters, not shown): ");
 if (!email.includes("@") || password.length < 12) {
   console.error("Need an email and a password of at least 12 characters.");
   Deno.exit(1);
@@ -33,3 +33,34 @@ if (error) {
   Deno.exit(1);
 }
 console.log(`${existing ? "Updated" : "Created"} admin ${email} on ${env.SUPABASE_URL}`);
+
+// Reads a line without echoing it, so the password never shows on screen.
+function readHidden(label: string): string {
+  const encoder = new TextEncoder();
+  Deno.stdout.writeSync(encoder.encode(label));
+  if (!Deno.stdin.isTerminal()) return prompt("") ?? "";
+  Deno.stdin.setRaw(true);
+  const bytes: number[] = [];
+  const buf = new Uint8Array(1);
+  let cancelled = false;
+  try {
+    while (Deno.stdin.readSync(buf)) {
+      const byte = buf[0];
+      if (byte === 3) { // Ctrl-C
+        cancelled = true;
+        break;
+      }
+      if (byte === 13 || byte === 10) break;
+      if (byte === 127 || byte === 8) {
+        // Drop one whole character, including the continuation bytes of a non-ASCII one.
+        while (bytes.length && (bytes[bytes.length - 1] & 0xc0) === 0x80) bytes.pop();
+        bytes.pop();
+      } else bytes.push(byte);
+    }
+  } finally {
+    Deno.stdin.setRaw(false);
+    Deno.stdout.writeSync(encoder.encode("\n"));
+  }
+  if (cancelled) Deno.exit(130);
+  return new TextDecoder().decode(new Uint8Array(bytes));
+}

@@ -1,10 +1,15 @@
 // Small display helpers shared across pages.
 
-export const AOP_NAMES: Record<string, string> = {
-  order_status: "Order status",
-  returns: "Returns",
-  policy_qa: "Policy questions",
-};
+// An AOP's display name, for places that only have its ID: "damaged_item" → "Damaged item".
+export function aopTitle(name: string): string {
+  const words = name.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+// An ID for a new AOP, from the name typed for it: "Damaged items!" → "damaged_items".
+export function aopId(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^(\d)/, "aop_$1").slice(0, 40);
+}
 
 export const SCENARIO_NAMES: Record<string, string> = {
   order_status_clarify: "Asks which order instead of guessing",
@@ -32,12 +37,18 @@ export function percent(part: number, whole: number): string {
   return whole ? `${Math.round((part / whole) * 100)}%` : "–";
 }
 
-// AOPs name most tools directly; identity checks are written as "Verify identity".
-const TOOL_PHRASES: Record<string, RegExp> = { verify_customer: /verify identity/i };
+// An AOP's text is its "Goal:" line (what it's used for, which the agent reads to pick it) and then its logic.
+export function splitAop(body: string): { goal: string; logic: string } {
+  const [first, ...rest] = body.split("\n");
+  return { goal: first.replace(/^Goal:\s*/i, ""), logic: rest.join("\n") };
+}
 
-// Tool names an AOP's text mentions, directly or by phrase.
-export function toolsIn(body: string, tools: string[]): string[] {
-  return tools.filter((t) => body.includes(t) || TOOL_PHRASES[t]?.test(body));
+export function sentence(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+export function joinAop(goal: string, logic: string): string {
+  return `Goal: ${goal.trim().replace(/\s*\n\s*/g, " ")}\n${logic.trim()}`;
 }
 
 export type DiffLine = { kind: "same" | "add" | "del"; text: string };

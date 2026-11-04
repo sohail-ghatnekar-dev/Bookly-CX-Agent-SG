@@ -5,7 +5,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { type ConversationRow, summarize } from "./stats.ts";
 
 const DAYS = 30;
-const MAX_CONVERSATIONS = 500;
+const PAGE = 1000; // the API returns at most this many rows per request
+const MAX_CONVERSATIONS = 10_000;
 
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
   JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}").default;
@@ -32,18 +33,24 @@ Deno.serve(async (req) => {
 
   try {
     const since = new Date(Date.now() - DAYS * 24 * 60 * 60 * 1000).toISOString();
-    const { data, error } = await db.from("conversations")
-      .select(
-        "id, status, current_procedure, created_at, messages(turn, role), escalations(reason, rule_ids, created_at), " +
-          "trace_events(kind, label, detail, outcome, rule_id, created_at)",
-      )
-      .eq("source", "live").gte("created_at", since).order("created_at", { ascending: false }).limit(MAX_CONVERSATIONS);
-    if (error) throw error;
+    const rows: ConversationRow[] = [];
+    for (let from = 0; from < MAX_CONVERSATIONS; from += PAGE) {
+      const { data, error } = await db.from("conversations")
+        .select(
+          "id, status, current_procedure, current_version, verified_customer_id, topic, csat, created_at, " +
+            "messages(turn, role), escalations(reason, rule_ids, created_at), " +
+            "trace_events(kind, label, detail, outcome, rule_id, created_at)",
+        )
+        .eq("source", "live").gte("created_at", since).order("created_at", { ascending: false }).range(from, from + PAGE - 1);
+      if (error) throw error;
+      rows.push(...(data as unknown as ConversationRow[]));
+      if (data.length < PAGE) break;
+    }
 
     const { data: evalRun } = await db.from("eval_runs").select("model, total, passed, resolved, escalated, ran_at")
       .order("ran_at", { ascending: false }).limit(1).maybeSingle();
 
-    return json({ ...summarize(data as unknown as ConversationRow[], DAYS), latest_eval: evalRun });
+    return json({ ...summarize(rows, DAYS), latest_eval: evalRun });
   } catch (err) {
     console.error("watchtower error:", err instanceof Error ? err.message : err);
     return json({ error: "Something went wrong. Try again." }, 500);

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { supabase } from "../lib/supabase";
+import { Bookworm } from "../components/Bookworm";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -24,14 +25,14 @@ export function LoginPage() {
     <div className="login">
       <form className="login-card" onSubmit={submit}>
         <div className="brand">
-          <span className="brand-mark">B</span>
+          <Bookworm size={36} />
           <div>
             <div className="brand-name">Bookly</div>
-            <div className="brand-sub">AOP console · Decagon</div>
+            <div className="brand-sub">Agent workspace</div>
           </div>
         </div>
         <h1>Sign in</h1>
-        <p className="muted">For the people who build and run Bookly's AOPs.</p>
+        <p className="muted">For the people who build and run Bookly's AI agent.</p>
         <label>
           Email
           <input type="email" autoComplete="username" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} />

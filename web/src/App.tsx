@@ -1,79 +1,65 @@
-// The AOP console: the implementer's side of the Bookly story. Sign-in, then Build/Test/Publish and Watchtower.
+// The Bookly workspace in an agent platform admin: sign-in, then Build (AOPs, tools), Analyze (Insights, Watchtowers),
+// Conversations, Versioning and Preview.
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
+import { Sidebar } from "./components/Sidebar";
+import { useRoute } from "./lib/router";
 import { supabase } from "./lib/supabase";
-import { AopsPage } from "./pages/Aops";
-import { AuditPage } from "./pages/Audit";
+import { AopDetailPage } from "./pages/AopDetail";
+import { AopListPage } from "./pages/AopList";
+import { ConversationsPage } from "./pages/Conversations";
+import { HomePage } from "./pages/Home";
+import { InsightsPage } from "./pages/Insights";
 import { LoginPage } from "./pages/Login";
-import { WatchtowerPage } from "./pages/Watchtower";
-
-type Page = "aops" | "watchtower" | "audit";
-
-const NAV: { id: Page; label: string; hint: string }[] = [
-  { id: "aops", label: "AOPs", hint: "Build, test, publish" },
-  { id: "watchtower", label: "Watchtower", hint: "Logs and guardrails" },
-  { id: "audit", label: "Audit log", hint: "Every change, by whom" },
-];
-
-function pageFromHash(): Page {
-  const id = window.location.hash.replace("#", "");
-  return NAV.some((n) => n.id === id) ? (id as Page) : "aops";
-}
+import { PreviewPage } from "./pages/Preview";
+import { TestSetsPage } from "./pages/TestSets";
+import { ToolsPage } from "./pages/Tools";
+import { VersioningPage } from "./pages/Versioning";
+import { WatchtowersPage } from "./pages/Watchtowers";
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const [page, setPage] = useState<Page>(pageFromHash);
+  const route = useRoute();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
-    const onHash = () => setPage(pageFromHash());
-    window.addEventListener("hashchange", onHash);
-    return () => {
-      data.subscription.unsubscribe();
-      window.removeEventListener("hashchange", onHash);
-    };
+    return () => data.subscription.unsubscribe();
   }, []);
 
   if (session === undefined) return null;
   if (!session) return <LoginPage />;
 
+  const [section = "home", page = "", id] = route.path;
   const isAdmin = session.user.app_metadata?.role === "admin";
 
   return (
     <div className="shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark">B</span>
-          <div>
-            <div className="brand-name">Bookly</div>
-            <div className="brand-sub">AOP console · Decagon</div>
-          </div>
-        </div>
-        <nav>
-          {NAV.map((n) => (
-            <a key={n.id} href={`#${n.id}`} className={`nav-item${page === n.id ? " active" : ""}`}>
-              <span className="nav-label">{n.label}</span>
-              <span className="nav-hint">{n.hint}</span>
-            </a>
-          ))}
-        </nav>
-        <div className="sidebar-foot">
-          <div className="who">{session.user.email}</div>
-          <button className="link" onClick={() => supabase.auth.signOut()}>Sign out</button>
-        </div>
-      </aside>
+      <Sidebar section={section} page={page} email={session.user.email ?? ""} onSignOut={() => supabase.auth.signOut()} />
       <main className="main">
         {!isAdmin ? (
-          <div className="empty">This account isn't a Bookly admin, so it can't open the console.</div>
-        ) : page === "aops" ? (
-          <AopsPage />
-        ) : page === "watchtower" ? (
-          <WatchtowerPage />
+          <div className="empty">This account isn't a Bookly admin, so it can't open the workspace.</div>
         ) : (
-          <AuditPage />
+          <Page section={section} page={page} id={id} query={route.query} />
         )}
       </main>
     </div>
   );
+}
+
+function Page({ section, page, id, query }: { section: string; page: string; id?: string; query: URLSearchParams }) {
+  if (section === "home") return <HomePage />;
+  if (section === "test") return <TestSetsPage key={id ?? ""} name={page === "sets" ? id : undefined} />;
+  if (section === "build" && page === "aops") return id ? <AopDetailPage key={id} name={id} /> : <AopListPage />;
+  if (section === "build" && page === "tools") return <ToolsPage />;
+  if (section === "analyze" && page === "insights") return <InsightsPage />;
+  if (section === "analyze" && page === "watchtowers") return <WatchtowersPage />;
+  if (section === "conversations") return <ConversationsPage />;
+  if (section === "versioning") return <VersioningPage />;
+  if (section === "preview") {
+    const aop = query.get("aop");
+    const v = Number(query.get("v"));
+    return <PreviewPage key={`${aop}:${v}`} testing={aop && v ? { name: aop, version: v } : undefined} />;
+  }
+  return <HomePage />;
 }

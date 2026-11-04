@@ -51,5 +51,7 @@ export interface ToolContext {
   trace: Trace;
   redteam: boolean;
   versions?: Record<string, number>; // AOP versions under test in a simulation, by name
+  procedures?: string[]; // AOPs select_procedure can pick this turn
+  allowed?: string[]; // tools the active AOP may call this step
   escalation?: Escalation;
 }

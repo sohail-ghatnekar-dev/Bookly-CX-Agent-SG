@@ -5,31 +5,53 @@ import { supabase } from "./supabase";
 export interface Version {
   name: string;
   version: number;
+  title: string | null;
   body: string;
+  tools: string[];
   is_active: boolean;
   published_at: string | null;
   author: string | null;
   note: string;
   created_at: string;
   latest_run: string | null;
+  tried_in_preview: boolean;
 }
 
 export interface Tool {
   name: string;
   description: string;
+  always_on: boolean;
+}
+
+// The fields an AOP version is saved with. Its tools are the ones the body references with @.
+export interface AopDraft {
+  name: string;
+  title: string;
+  body: string;
+  note: string;
 }
 
 export interface Scenario {
   id: string;
   procedure: string;
+  expect: string; // what should happen, in plain English
   turns: string[];
+  checks: string[]; // each check, in plain English
   gate: boolean;
+}
+
+export interface CheckResult {
+  check: string;
+  passed: boolean;
+  problem?: string;
 }
 
 export interface Overview {
   versions: Version[];
   tools: Tool[];
   scenarios: Scenario[];
+  latest_eval: { model: string; total: number; passed: number; resolved: number; escalated: number; ran_at: string } | null;
+  metadata: { key: string; description: string }[];
 }
 
 export interface SimResult {
@@ -37,6 +59,7 @@ export interface SimResult {
   passed: boolean;
   outcome: "resolved" | "escalated" | "failed";
   failures: string[];
+  checks?: CheckResult[];
   replies: string[];
   conversation_id: string | null;
   ms: number;
@@ -46,7 +69,8 @@ export interface AuditEvent {
   id: string;
   procedure: string;
   version: number | null;
-  action: "draft_saved" | "simulation_run" | "published" | "rolled_back";
+  action: "created" | "draft_saved" | "draft_discarded" | "simulation_run" | "published" | "rolled_back" | "retired";
+  title: string | null;
   actor: string;
   detail: string;
   created_at: string;
@@ -62,6 +86,8 @@ export interface ConversationSummary {
   steps: number;
   guards: string[];
   denials: number;
+  flags: string[];
+  handoff: string | null;
 }
 
 export interface TraceStep {
@@ -79,8 +105,45 @@ export interface TraceStep {
 
 export interface ConversationDetail {
   conversation: { id: string; created_at: string; status: string; source: string; current_procedure: string | null; current_version: number | null; verified: boolean };
-  messages: { turn: number; role: string; text: string }[];
+  messages: { turn: number; role: string; text: string; sent: boolean }[];
   trace: TraceStep[];
+}
+
+export interface ChatTraceLine {
+  seq: number;
+  kind: string;
+  label: string;
+  detail: string;
+  outcome: string;
+  rule_id?: string;
+  ms: number;
+}
+
+export interface Escalation {
+  summary: string;
+  verified: boolean;
+  rule_ids: string[];
+  customer_name?: string;
+}
+
+// What the agent sends back for one message: the same shape the iPhone app gets.
+export interface ChatReply {
+  conversation_id: string;
+  turn: number;
+  reply: string;
+  status: string;
+  citations: string[];
+  suggestions: string[];
+  trace: ChatTraceLine[];
+  escalation?: Escalation;
+}
+
+export interface TestOrder {
+  order_number: string;
+  email: string;
+  status: string;
+  delivered_days_ago: number | null;
+  items: string[];
 }
 
 export interface Count {
@@ -103,7 +166,31 @@ export interface WatchtowerSummary {
   controls: (Count & { what: string })[];
   rules_enforced: Count[];
   recent_flags: { name: string; detail: string; at: string }[];
-  latest_eval: { model: string; total: number; passed: number } | null;
+  latest_eval: { model: string; total: number; passed: number; ran_at: string } | null;
+  categories: (Count & { deflected: number })[];
+  daily: { date: string; total: number; deflected: number; csat: number | null }[];
+  csat: { rated: number; average: number | null; counts: number[] };
+  watchtowers: Watchtower[];
+  hourly: number[];
+  messages_per_chat: number[];
+  articles: Count[];
+}
+
+export interface Watchtower {
+  key: string;
+  name: string;
+  category: string;
+  rubric: string;
+  count: number;
+  conversations: {
+    id: string;
+    created_at: string;
+    topic: string;
+    aop: string | null;
+    status: string;
+    verified: boolean;
+    csat: number | null;
+  }[];
 }
 
 async function call<T>(fn: string, body: Record<string, unknown>): Promise<T> {
@@ -123,14 +210,20 @@ const consoleCall = <T>(action: string, input: Record<string, unknown> = {}) => 
 
 export const api = {
   overview: () => consoleCall<Overview>("overview"),
-  saveDraft: (name: string, body: string, note: string) => consoleCall<{ name: string; version: number }>("save_draft", { name, body, note }),
+  createAop: (draft: AopDraft) => consoleCall<{ name: string; version: number }>("create_aop", { ...draft }),
+  saveDraft: (draft: AopDraft) => consoleCall<{ name: string; version: number }>("save_draft", { ...draft }),
+  discardDraft: (name: string, version: number) => consoleCall<{ name: string }>("discard_draft", { name, version }),
+  retire: (name: string) => consoleCall<{ version: number }>("retire", { name }),
+  chat: (message: string, conversationId: string | null, testing?: { name: string; version: number }) =>
+    consoleCall<ChatReply>("chat", { message, conversation_id: conversationId, testing }),
   runStart: (name: string, version: number) => consoleCall<{ run_id: string; scenarios: string[] }>("run_start", { name, version }),
   runScenario: (runId: string, scenarioId: string) => consoleCall<SimResult>("run_scenario", { run_id: runId, scenario_id: scenarioId }),
-  runGet: (runId: string) => consoleCall<{ run: { id: string; created_at: string }; results: SimResult[] }>("run_get", { run_id: runId }),
+  runGet: (runId: string) => consoleCall<{ run: { id: string; created_at: string; started_by: string; version: number }; results: SimResult[] }>("run_get", { run_id: runId }),
   publish: (name: string, version: number) => consoleCall<{ previous: number | null }>("publish", { name, version }),
   rollback: (name: string, version: number) => consoleCall<{ previous: number | null }>("rollback", { name, version }),
+  testCustomers: () => consoleCall<{ orders: TestOrder[] }>("test_customers"),
   auditLog: () => consoleCall<{ events: AuditEvent[] }>("audit_log"),
-  conversations: () => consoleCall<{ conversations: ConversationSummary[] }>("conversations"),
+  conversations: (source: "live" | "test" = "live") => consoleCall<{ conversations: ConversationSummary[] }>("conversations", { source }),
   conversation: (id: string) => consoleCall<ConversationDetail>("conversation", { id }),
   watchtower: () => call<WatchtowerSummary>("watchtower", {}),
 };

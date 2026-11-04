@@ -2,11 +2,18 @@
 // Admin only: the caller's session must carry app_metadata.role = "admin". Writes use the service role.
 import { createClient, type User } from "npm:@supabase/supabase-js@2";
 import { handleMessage } from "../agent/handle.ts";
-import { TOOL_DEFS } from "../agent/tools.ts";
-import { cleanup, grade, SCENARIOS } from "../_shared/scenarios.ts";
+import { METADATA, METADATA_REF } from "../agent/metadata.ts";
+import { ALWAYS_ON, AOP_TOOLS, TOOL_DEFS } from "../agent/tools.ts";
+import { cleanup, describe, grade, SCENARIOS } from "../_shared/scenarios.ts";
 
-const AOPS = ["order_status", "returns", "policy_qa"];
 const MAX_BODY_CHARS = 4000;
+const MAX_MESSAGE_CHARS = 1000;
+const MAX_AOPS = 12; // every live AOP's Goal line goes into the system prompt
+const AOP_NAME = /^[a-z][a-z0-9_]{2,39}$/;
+// @tool and #aop references, at the start of a line or after a space or bracket (so emails don't count).
+const TOOL_REF = /(?:^|[\s(])@([a-z_]+)/g;
+const AOP_REF = /(?:^|[\s(])#([a-z][a-z0-9_]*)/g;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
   JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}").default;
@@ -56,32 +63,62 @@ const ACTIONS: Record<string, Action> = {
   // Everything the Build tab needs: every version of every AOP, its tools, its scenarios and latest test.
   async overview() {
     const { data: versions, error } = await db.from("procedures")
-      .select("name, version, body, is_active, published_at, author, note, created_at")
+      .select("name, version, title, body, tools, is_active, published_at, author, note, created_at")
       .eq("is_redteam", false).order("name").order("version", { ascending: false });
     if (error) throw error;
     const { data: runs } = await db.from("simulation_runs").select("id, procedure, version, created_at")
       .order("created_at", { ascending: false }).limit(100);
     const latest = new Map<string, string>();
     for (const r of runs ?? []) latest.has(`${r.procedure}:${r.version}`) || latest.set(`${r.procedure}:${r.version}`, r.id);
+    const { data: latestEval } = await db.from("eval_runs").select("model, total, passed, resolved, escalated, ran_at")
+      .order("ran_at", { ascending: false }).limit(1).maybeSingle();
+    const tried = new Set<string>();
+    for (const v of versions.filter((v) => !v.published_at)) {
+      if (await triedOnPhone(v.name, v.version, v.created_at)) tried.add(`${v.name}:${v.version}`);
+    }
     return {
-      versions: versions.map((v) => ({ ...v, latest_run: latest.get(`${v.name}:${v.version}`) ?? null })),
-      tools: TOOL_DEFS.map((t) => ({ name: t.name, description: t.description })),
-      scenarios: SCENARIOS.map(({ id, procedure, turns, gate }) => ({ id, procedure, turns, gate: gate !== false })),
+      versions: versions.map((v) => ({
+        ...v,
+        latest_run: latest.get(`${v.name}:${v.version}`) ?? null,
+        tried_in_preview: tried.has(`${v.name}:${v.version}`),
+      })),
+      tools: TOOL_DEFS.map((t) => ({ name: t.name, description: t.description, always_on: ALWAYS_ON.includes(t.name) })),
+      latest_eval: latestEval,
+      metadata: METADATA,
+      scenarios: SCENARIOS.map((s) => ({
+        id: s.id,
+        procedure: s.procedure,
+        expect: s.expect,
+        turns: s.turns,
+        checks: s.assert.map(describe),
+        gate: s.gate !== false,
+      })),
     };
+  },
+
+  // A new AOP starts as draft v1. Nobody sees it until it passes its tests and is published.
+  async create_aop(user, input) {
+    const name = String(input.name ?? "");
+    if (!AOP_NAME.test(name)) throw new Refusal("Use 3-40 lowercase letters, digits or underscores for the AOP's ID.");
+    const { data: existing } = await db.from("procedures").select("name");
+    const names = new Set((existing ?? []).map((r) => r.name));
+    if (names.has(name)) throw new Refusal(`There's already an AOP called ${name}.`);
+    if (names.size >= MAX_AOPS) throw new Refusal(`The console allows up to ${MAX_AOPS} AOPs.`);
+    const fields = draftFields(user, input, [...names, name]);
+    const { error } = await db.from("procedures").insert({ name, version: 1, is_active: false, is_redteam: false, ...fields });
+    if (error) throw error;
+    await audit(name, 1, "created", user, fields.note);
+    return { name, version: 1 };
   },
 
   // One open draft per AOP: saving edits it, or starts one above the highest version.
   async save_draft(user, input) {
-    const name = aopName(input.name);
-    const body = String(input.body ?? "").trim();
-    const note = String(input.note ?? "").trim().slice(0, 200);
-    if (!body || body.length > MAX_BODY_CHARS) throw new Refusal(`The AOP must be 1-${MAX_BODY_CHARS} characters.`);
-    if (!/^Goal:/i.test(body)) throw new Refusal('Start the AOP with a "Goal:" line.');
+    const name = await aopName(input.name);
+    const fields = draftFields(user, input, await aopNames());
 
     const { data: rows } = await db.from("procedures").select("version, published_at, is_redteam")
       .eq("name", name).order("version", { ascending: false });
     const draft = rows?.find((r) => !r.published_at && !r.is_redteam);
-    const fields = { body, note, author: user.email, created_at: new Date().toISOString() };
     let version: number;
     if (draft) {
       version = draft.version;
@@ -92,14 +129,51 @@ const ACTIONS: Record<string, Action> = {
       const { error } = await db.from("procedures").insert({ name, version, is_active: false, is_redteam: false, ...fields });
       if (error) throw error;
     }
-    await audit(name, version, "draft_saved", user, note);
+    await audit(name, version, "draft_saved", user, fields.note);
     return { name, version };
+  },
+
+  // Throws away the open draft. Published versions are never deleted.
+  async discard_draft(user, input) {
+    const { name, version, row } = await versionOf(input);
+    if (row.published_at) throw new Refusal("Only drafts can be discarded.");
+    const { error } = await db.from("procedures").delete().eq("name", name).eq("version", version);
+    if (error) throw error;
+    await audit(name, version, "draft_discarded", user, "");
+    return { name, version };
+  },
+
+  // Takes an AOP out of the agent: no version is active, so the concierge can't pick it. Publish or roll back to return.
+  async retire(user, input) {
+    const name = await aopName(input.name);
+    const { data: current } = await db.from("procedures").select("version").eq("name", name).eq("is_active", true).maybeSingle();
+    if (!current) throw new Refusal("This AOP isn't live.");
+    const { error } = await db.from("procedures").update({ is_active: false }).eq("name", name).eq("version", current.version);
+    if (error) throw error;
+    await audit(name, current.version, "retired", user, "");
+    return { name, version: current.version };
+  },
+
+  // One message from the console's test phone, against live AOPs plus the version under test, if any.
+  // Test chats are kept for their logs but stay out of Watchtower.
+  async chat(user, input) {
+    const message = typeof input.message === "string" ? input.message.trim() : "";
+    if (!message || message.length > MAX_MESSAGE_CHARS) throw new Refusal(`Messages must be 1-${MAX_MESSAGE_CHARS} characters.`);
+    const conversationId = input.conversation_id ?? null;
+    if (conversationId !== null && !UUID.test(String(conversationId))) throw new Refusal("Unknown conversation", 404);
+    const versions = input.testing ? await versionOf(input.testing as Input).then(({ name, version }) => ({ [name]: version })) : undefined;
+    const out = await handleMessage(db, user.id, conversationId as string | null, message, { versions, source: "test" });
+    if (!out.ok) throw new Refusal(out.error, out.status);
+    return out.body;
   },
 
   // Starts a test of one version; the console then runs each scenario with run_scenario.
   async run_start(user, input) {
     const { name, version } = await versionOf(input);
-    const scenarios = SCENARIOS.filter((s) => s.procedure === name).map((s) => s.id);
+    // A new AOP has no scripted scenarios yet. Adding it changes what the concierge can pick,
+    // so its test is every existing scenario, to show the other AOPs still behave.
+    const own = SCENARIOS.filter((s) => s.procedure === name).map((s) => s.id);
+    const scenarios = own.length ? own : SCENARIOS.map((s) => s.id);
     const { data, error } = await db.from("simulation_runs")
       .insert({ procedure: name, version, scenario_ids: scenarios, started_by: user.email }).select("id").single();
     if (error) throw error;
@@ -140,6 +214,7 @@ const ACTIONS: Record<string, Action> = {
       passed: result.passed,
       outcome: result.outcome,
       failures: result.failures,
+      checks: result.checks,
       replies: result.replies,
       conversation_id: conversationId ?? null,
       ms: Date.now() - started,
@@ -168,6 +243,9 @@ const ACTIONS: Record<string, Action> = {
     const gated = SCENARIOS.filter((s) => run.scenario_ids.includes(s.id) && s.gate !== false).map((s) => s.id);
     const missing = gated.filter((id) => !results?.some((r) => r.scenario_id === id && r.passed));
     if (missing.length) throw new Refusal(`Not every simulation passed: ${missing.join(", ")}.`);
+    if (!SCENARIOS.some((s) => s.procedure === name) && !(await triedOnPhone(name, version, row.created_at))) {
+      throw new Refusal(`Try v${version} in the test phone first: no scripted scenario covers a new AOP yet.`);
+    }
 
     const previous = await activate(name, version, { published_at: new Date().toISOString() });
     await audit(name, version, "published", user, previous ? `replaces v${previous}` : "");
@@ -184,18 +262,40 @@ const ACTIONS: Record<string, Action> = {
     return { name, version, previous };
   },
 
+  // The seeded customers and their orders, for the test phone's cheat sheet. Days are counted from today.
+  async test_customers() {
+    const { data, error } = await db.from("orders")
+      .select("order_number, status, delivered_at, placed_at, customers!inner(email), order_items(title, format)")
+      .order("placed_at", { ascending: false });
+    if (error) throw error;
+    const day = 24 * 60 * 60 * 1000;
+    return {
+      orders: data.map((o) => ({
+        order_number: o.order_number,
+        email: (o.customers as unknown as { email: string }).email,
+        status: o.status,
+        delivered_days_ago: o.delivered_at ? Math.floor((Date.now() - Date.parse(o.delivered_at)) / day) : null,
+        items: o.order_items.map((i: { title: string; format: string }) => i.format === "ebook" ? `${i.title} (ebook)` : i.title),
+      })),
+    };
+  },
+
   async audit_log() {
     const { data, error } = await db.from("aop_events").select("*").order("created_at", { ascending: false }).limit(40);
     if (error) throw error;
-    return { events: data };
+    const { data: names } = await db.from("procedures").select("name, title").order("version", { ascending: false });
+    const titles = new Map<string, string>();
+    for (const p of names ?? []) if (p.title && !titles.has(p.name)) titles.set(p.name, p.title);
+    return { events: data.map((e) => ({ ...e, title: titles.get(e.procedure) ?? null })) };
   },
 
-  // Watchtower's log view: recent live conversations, newest first, with the guardrails each one hit.
-  async conversations() {
+  // Watchtower's log view: recent live conversations (or test-phone chats), newest first, with the guardrails each hit.
+  async conversations(_user, input) {
+    const source = input.source === "test" ? "test" : "live";
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await db.from("conversations")
-      .select("id, created_at, status, current_procedure, current_version, verified_customer_id, messages(turn, role), trace_events(kind, label, outcome)")
-      .eq("source", "live").gte("created_at", since).order("created_at", { ascending: false }).limit(60);
+      .select("id, created_at, status, current_procedure, current_version, verified_customer_id, messages(turn, role), trace_events(kind, label, outcome), escalations(reason)")
+      .eq("source", source).gte("created_at", since).order("created_at", { ascending: false }).limit(60);
     if (error) throw error;
     return {
       conversations: (data as unknown as ConversationRow[])
@@ -209,6 +309,12 @@ const ACTIONS: Record<string, Action> = {
           turns: Math.max(...c.messages.filter((m) => m.role === "user").map((m) => m.turn)),
           steps: c.trace_events.length,
           guards: [...new Set(c.trace_events.filter((e) => e.kind === "guard").map((e) => e.label))],
+          // Watchtower keys this conversation matches: its guardrails, plus a failed identity check.
+          flags: [...new Set([
+            ...c.trace_events.filter((e) => e.kind === "guard").map((e) => e.label),
+            ...c.trace_events.some((e) => e.label === "verify_customer" && e.outcome === "denied") ? ["verify_failed"] : [],
+          ])],
+          handoff: c.escalations[0]?.reason ?? null,
           denials: c.trace_events.filter((e) => e.outcome === "denied" || e.outcome === "blocked").length,
         })),
     };
@@ -225,9 +331,11 @@ const ACTIONS: Record<string, Action> = {
       db.from("trace_events").select("turn, seq, kind, label, detail, outcome, rule_id, ms, input, output, created_at")
         .eq("conversation_id", id).order("seq"),
     ]);
+    // Text next to a tool call is the agent narrating its next step; the customer only gets the final reply.
     const said = (messages ?? []).flatMap((m) => {
-      const text = (m.content as { type: string; text?: string }[]).filter((b) => b.type === "text").map((b) => b.text).join("\n");
-      return text ? [{ turn: m.turn, role: m.role, text }] : [];
+      const blocks = m.content as { type: string; text?: string }[];
+      const text = blocks.filter((b) => b.type === "text").map((b) => b.text).join("\n");
+      return text ? [{ turn: m.turn, role: m.role, text, sent: !blocks.some((b) => b.type === "tool_use") }] : [];
     });
     return { conversation: { ...conv, verified: !!conv.verified_customer_id }, messages: said, trace: trace ?? [] };
   },
@@ -242,16 +350,50 @@ interface ConversationRow {
   verified_customer_id: string | null;
   messages: { turn: number; role: string }[];
   trace_events: { kind: string; label: string; outcome: string }[];
+  escalations: { reason: string }[];
 }
 
-function aopName(value: unknown): string {
+async function aopName(value: unknown): Promise<string> {
   const name = String(value ?? "");
-  if (!AOPS.includes(name)) throw new Refusal("Unknown AOP");
+  if (!AOP_NAME.test(name)) throw new Refusal("Unknown AOP", 404);
+  const { count } = await db.from("procedures").select("id", { count: "exact", head: true }).eq("name", name);
+  if (!count) throw new Refusal("Unknown AOP", 404);
   return name;
 }
 
+// What a saved version holds: its text, its title, and the tools it may call: the ones its text references with @.
+function draftFields(user: User, input: Input, aops: string[]) {
+  const body = String(input.body ?? "").trim();
+  const title = String(input.title ?? "").trim().slice(0, 60);
+  const note = String(input.note ?? "").trim().slice(0, 200);
+  if (!title) throw new Refusal("Give the AOP a name.");
+  if (!body || body.length > MAX_BODY_CHARS) throw new Refusal(`The AOP must be 1-${MAX_BODY_CHARS} characters.`);
+  if (!/^Goal:/i.test(body)) throw new Refusal("Say what the AOP is used for.");
+  const refs = [...new Set([...body.matchAll(TOOL_REF)].map((m) => m[1]))];
+  const unknownTools = refs.filter((t) => !TOOL_DEFS.some((d) => d.name === t));
+  if (unknownTools.length) throw new Refusal(`There's no tool called ${unknownTools.map((t) => `@${t}`).join(", ")}.`);
+  const unknownAops = [...new Set([...body.matchAll(AOP_REF)].map((m) => m[1]))].filter((a) => !aops.includes(a));
+  if (unknownAops.length) throw new Refusal(`There's no AOP called ${unknownAops.map((a) => `#${a}`).join(", ")}.`);
+  const unknownKeys = [...new Set([...body.matchAll(METADATA_REF)].map((m) => m[1]))].filter((k) => !METADATA.some((d) => d.key === k));
+  if (unknownKeys.length) throw new Refusal(`There's no metadata called ${unknownKeys.map((k) => `{{ ${k} }}`).join(", ")}.`);
+  const tools = refs.filter((t) => AOP_TOOLS.includes(t));
+  return { body, title, tools, note, author: user.email, created_at: new Date().toISOString() };
+}
+
+async function aopNames(): Promise<string[]> {
+  const { data } = await db.from("procedures").select("name");
+  return [...new Set((data ?? []).map((r) => r.name))];
+}
+
+// A new AOP's publish needs someone to have chatted with exactly this text in the test phone.
+async function triedOnPhone(name: string, version: number, since: string): Promise<boolean> {
+  const { count } = await db.from("conversations").select("id", { count: "exact", head: true })
+    .eq("source", "test").eq("current_procedure", name).eq("current_version", version).gt("created_at", since);
+  return (count ?? 0) > 0;
+}
+
 async function versionOf(input: Input) {
-  const name = aopName(input.name);
+  const name = await aopName(input.name);
   const version = Number(input.version);
   const { data: row } = await db.from("procedures").select("version, is_active, published_at, created_at, is_redteam")
     .eq("name", name).eq("version", version).maybeSingle();

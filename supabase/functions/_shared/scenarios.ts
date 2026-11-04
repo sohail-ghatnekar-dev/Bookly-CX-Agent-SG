@@ -4,18 +4,21 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import list from "./scenarios.json" with { type: "json" };
 
 type Match = { label: string; outcome?: string; rule_id?: string; detail?: string };
-export type Assertion =
+// `say` is how the console words a check when the generated wording would be unreadable (a regex, say).
+export type Assertion = { say?: string } & (
   | ({ type: "trace_has" | "trace_lacks" } & Match)
   | { type: "call_order"; before: Match; after: Match }
   | { type: "no_tool_before_turn"; label: string; turn: number; detail?: string }
   | { type: "db_row_exists" | "db_row_absent"; table: string; where: Record<string, unknown> }
   | { type: "reply_matches" | "reply_not_matches"; turn?: number | "last"; regex: string }
   | { type: "no_flagged_events" }
-  | { type: "escalated"; value: boolean | "any" };
+  | { type: "escalated"; value: boolean | "any" }
+);
 
 export interface Scenario {
   id: string;
   procedure: string; // the AOP this scenario tests
+  expect: string; // what should happen, in plain English
   turns: string[];
   assert: Assertion[];
   redteam?: boolean;
@@ -25,8 +28,15 @@ export interface Scenario {
 
 export interface Event { turn: number; seq: number; kind: string; label: string; detail: string; outcome: string; rule_id: string | null }
 
+export interface Check {
+  check: string;
+  passed: boolean;
+  problem?: string;
+}
+
 export interface Run {
   passed: boolean;
+  checks: Check[];
   outcome: "resolved" | "escalated" | "failed";
   guards: string[];
   failures: string[];
@@ -48,19 +58,66 @@ export async function grade(
     ? await rows<Event>(db, "trace_events", conversationId, "turn, seq, kind, label, detail, outcome, rule_id", "seq")
     : [];
   const escalated = conversationId ? (await rows(db, "escalations", conversationId, "id")).length > 0 : false;
+  const checks: Check[] = [];
   for (const a of s.assert) {
     const problem = await check(db, a, { trace, replies, escalated, conversationId });
     if (problem) failures.push(problem);
+    checks.push({ check: describe(a), passed: !problem, ...(problem ? { problem } : {}) });
   }
   const passed = failures.length === 0;
   return {
     passed,
+    checks,
     outcome: passed && !escalated ? "resolved" : escalated ? "escalated" : "failed",
     guards: [...new Set(trace.filter((e) => e.kind === "guard").map((e) => e.label))],
     failures,
     replies,
     trace,
   };
+}
+
+const LABELS: Record<string, string> = {
+  verify_customer: "The identity check",
+  list_orders: "Listing the customer's orders",
+  get_order_status: "Looking up the order",
+  eligibility: "The eligibility check",
+  initiate_return: "Starting the return",
+  get_policy: "Reading the policy documents",
+  escalate_to_human: "Handing off to an employee",
+  sources: "The policy citation",
+  invalid_citation: "A made-up citation",
+};
+const OUTCOMES: Record<string, string> = { ok: "succeeds", denied: "says no", blocked: "is blocked", flagged: "is flagged" };
+
+// A check in plain English, for the console: "The eligibility check says no under RET-30".
+export function describe(a: Assertion): string {
+  if (a.say) return a.say;
+  const said = (m: Match) =>
+    [LABELS[m.label] ?? m.label, m.outcome ? OUTCOMES[m.outcome] ?? m.outcome : "", m.rule_id ? `under ${m.rule_id}` : "",
+      m.detail ? `(${m.detail.replace(/\\b/g, "")})` : ""].filter(Boolean).join(" ");
+  const line = (where: Record<string, unknown>) => String(Object.values(where)[0]);
+  switch (a.type) {
+    case "trace_has":
+      return said(a);
+    case "trace_lacks":
+      return `${said(a)}: never happens`;
+    case "call_order":
+      return `${said(a.after)} only after ${said(a.before).replace(/^The /, "the ")}`;
+    case "no_tool_before_turn":
+      return `${LABELS[a.label] ?? a.label}${a.detail ? ` for ${a.detail}` : ""} waits for message ${a.turn}`;
+    case "db_row_exists":
+      return a.table === "returns" ? `A return is recorded for ${line(a.where)}` : "A handoff with a verified customer is recorded";
+    case "db_row_absent":
+      return a.table === "returns" ? `No return is recorded for ${line(a.where)}` : `No ${a.table} row is recorded`;
+    case "reply_matches":
+      return `A reply matches /${a.regex}/`;
+    case "reply_not_matches":
+      return `No reply matches /${a.regex}/`;
+    case "no_flagged_events":
+      return "Nothing is flagged for review";
+    case "escalated":
+      return a.value === true ? "The chat is handed to an employee" : a.value === false ? "The agent resolves it without an employee" : "Handoff either way";
+  }
 }
 
 // Keeps seed data reusable: removes the run's returns and escalations, then the conversation itself.

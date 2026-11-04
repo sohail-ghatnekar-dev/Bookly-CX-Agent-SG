@@ -13,7 +13,7 @@ const CONVERSATION_COLUMNS =
 export interface TurnOptions {
   redteam?: boolean;
   versions?: Record<string, number>; // AOP name → version to use instead of the active one
-  source?: "live" | "simulation";
+  source?: "live" | "simulation" | "test";
 }
 
 export type TurnOutcome =

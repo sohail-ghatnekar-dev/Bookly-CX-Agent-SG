@@ -1,11 +1,11 @@
 // Tool definitions and execution. Identity, ownership and policy checks live here, not in the prompt.
 import type { Tool } from "./anthropic.ts";
+import { render } from "./metadata.ts";
 import { evaluateReturn, type ReturnDecision, type ReturnReason } from "./policy.ts";
 import type { NewEvent } from "./trace.ts";
 import type { ContentBlock, ToolContext } from "./types.ts";
 
 const MAX_VERIFY_FAILURES = 3;
-const PROCEDURES = ["order_status", "returns", "policy_qa"];
 const REASONS = ["damaged_defective", "changed_mind"];
 
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
@@ -26,7 +26,7 @@ export const TOOL_DEFS: Tool[] = [
     name: "select_procedure",
     description:
       "Load the procedure for the customer's current request. Call it when no procedure is active or the intent changes.",
-    input_schema: obj({ name: { type: "string", enum: PROCEDURES } }, ["name"]),
+    input_schema: obj({ name: { type: "string" } }, ["name"]), // toolsFor() lists the AOPs as an enum
   },
   {
     name: "verify_customer",
@@ -77,6 +77,19 @@ export const TOOL_DEFS: Tool[] = [
   },
 ];
 
+// Routing and handoff work in every AOP. Every other tool has to be on the active AOP's list.
+export const ALWAYS_ON = ["select_procedure", "escalate_to_human"];
+export const AOP_TOOLS = TOOL_DEFS.map((t) => t.name).filter((n) => !ALWAYS_ON.includes(n));
+
+// The tools the model sees this step: the always-on ones plus the active AOP's, with the AOPs it can pick.
+export function toolsFor(procedures: string[], allowed: string[]): Tool[] {
+  return TOOL_DEFS.filter((t) => allowed.includes(t.name)).map((t) =>
+    t.name === "select_procedure"
+      ? { ...t, input_schema: obj({ name: { type: "string", enum: procedures } }, ["name"]) }
+      : t
+  );
+}
+
 // What a tool returns to the model, plus the trace event describing it.
 type Result = { output: Record<string, unknown>; is_error?: boolean; event: Omit<NewEvent, "input" | "output" | "ms"> };
 type Input = Record<string, unknown>;
@@ -91,9 +104,11 @@ export async function executeTool(
   let result: Result;
   try {
     const handler = HANDLERS[use.name];
-    result = handler
-      ? await handler(ctx, use.input ?? {})
-      : fail({ error: "unknown_tool" }, { kind: "guard", label: "unknown_tool", detail: use.name, outcome: "error" });
+    result = !handler
+      ? fail({ error: "unknown_tool" }, { kind: "guard", label: "unknown_tool", detail: use.name, outcome: "error" })
+      : ctx.allowed && !ctx.allowed.includes(use.name)
+      ? fail({ error: "tool_not_allowed" }, { kind: "guard", label: "tool_not_allowed", detail: use.name, outcome: "blocked" })
+      : await handler(ctx, use.input ?? {});
   } catch (err) {
     console.error(`tool ${use.name} failed:`, err instanceof Error ? err.message : err);
     result = fail({ error: "internal_error" }, { kind: "tool", label: LABELS[use.name] ?? use.name, detail: "error", outcome: "error" });
@@ -122,13 +137,13 @@ const fail = (output: Record<string, unknown>, event: Result["event"]): Result =
 const HANDLERS: Record<string, (ctx: ToolContext, input: Input) => Promise<Result>> = {
   async select_procedure(ctx, input) {
     const name = String(input.name ?? "");
-    if (!PROCEDURES.includes(name)) {
+    const proc = ctx.procedures?.includes(name) ? await loadProcedure(ctx, name) : null;
+    if (!proc) {
       return fail({ error: "unknown_procedure" }, { kind: "procedure", label: "procedure", detail: name, outcome: "error" });
     }
-    const proc = await loadProcedure(ctx, name);
     await updateConversation(ctx, { current_procedure: proc.name, current_version: proc.version });
     return ok(
-      { procedure: proc.name, version: proc.version, body: proc.body },
+      { procedure: proc.name, version: proc.version, body: await render(ctx, proc.body) },
       { kind: "procedure", label: "procedure", detail: `${proc.name} v${proc.version}`, outcome: "ok" },
     );
   },
@@ -189,6 +204,7 @@ const HANDLERS: Record<string, (ctx: ToolContext, input: Input) => Promise<Resul
     if ("denied" in order) return order.denied;
     const o = order.row;
     const today = new Date().toISOString().slice(0, 10);
+    const late = o.status === "shipped" && !!o.estimated_delivery && o.estimated_delivery < today;
     return ok({
       order: o.order_number,
       status: o.status,
@@ -196,9 +212,9 @@ const HANDLERS: Record<string, (ctx: ToolContext, input: Input) => Promise<Resul
       tracking: o.tracking_number,
       est_delivery: o.estimated_delivery,
       delivered: o.delivered_at?.slice(0, 10) ?? null,
-      late: o.status === "shipped" && !!o.estimated_delivery && o.estimated_delivery < today,
+      late,
       items: o.order_items.map((i) => ({ line: i.line_code, title: i.title, format: i.format })),
-    }, { kind: "tool", label: "get_order_status", detail: `${o.order_number} ${o.status}`, outcome: "ok" });
+    }, { kind: "tool", label: "get_order_status", detail: `${o.order_number} ${o.status}${late ? " late" : ""}`, outcome: "ok" });
   },
 
   async check_return_eligibility(ctx, input) {
@@ -383,9 +399,9 @@ async function loadProcedure(ctx: ToolContext, name: string) {
     : useRedteam
     ? query.eq("is_redteam", true)
     : query.eq("is_active", true);
-  const { data, error } = await scoped.order("version", { ascending: false }).limit(1).single();
+  const { data, error } = await scoped.order("version", { ascending: false }).limit(1).maybeSingle();
   if (error) throw error;
-  return data as { name: string; version: number; body: string };
+  return data as { name: string; version: number; body: string } | null;
 }
 
 async function policyBody(ctx: ToolContext, id: string): Promise<string> {

@@ -1,8 +1,9 @@
 // One customer turn: model loop, tool execution, post-checks, persistence.
 import { createMessage } from "./anthropic.ts";
+import { render } from "./metadata.ts";
 import { buildSystemPrompt, FALLBACK_REPLY, type ProcedureRef, REFUSAL_REPLY } from "./prompts.ts";
 import { suggestReplies } from "./suggest.ts";
-import { executeTool, TOOL_DEFS } from "./tools.ts";
+import { ALWAYS_ON, executeTool, toolsFor } from "./tools.ts";
 import type { ContentBlock, Message, ToolContext } from "./types.ts";
 
 const MAX_STEPS = 6;
@@ -23,12 +24,18 @@ export async function runTurn(ctx: ToolContext, turn: number, userText: string):
   const { conv, trace } = ctx;
   const history = await loadHistory(ctx);
   const index = await loadProcedureIndex(ctx);
+  ctx.procedures = index.map((p) => p.name);
   const added: Message[] = [{ role: "user", content: [{ type: "text", text: userText }] }];
 
   let reply = "";
   for (let step = 0; step < MAX_STEPS && !reply; step++) {
-    const system = buildSystemPrompt(index, await currentProcedure(ctx), !!conv.verified_customer_id);
-    const res = await createMessage(system, mergeRoles([...history, ...added]), TOOL_DEFS);
+    // The active AOP decides which tools exist this step; picking a new AOP takes effect on the next step.
+    // {{ metadata }} is filled in fresh each step, since verifying the customer mid-turn changes it.
+    const current = await currentProcedure(ctx);
+    ctx.allowed = [...ALWAYS_ON, ...(current?.tools ?? [])];
+    const filled = current && { ...current, body: await render(ctx, current.body) };
+    const system = buildSystemPrompt(index, filled, !!conv.verified_customer_id);
+    const res = await createMessage(system, mergeRoles([...history, ...added]), toolsFor(ctx.procedures, ctx.allowed));
     const toolUses = res.content.filter((b) => b.type === "tool_use");
 
     if (res.stop_reason === "refusal") {
@@ -126,22 +133,32 @@ async function persist(ctx: ToolContext, turn: number, firstSeq: number, added: 
   }
 }
 
+// Every live AOP, with any version under test in its place (or added, for a new AOP that isn't live yet).
 async function loadProcedureIndex(ctx: ToolContext): Promise<ProcedureRef[]> {
-  const { data, error } = await ctx.db.from("procedures").select("name, version, body")
+  const { data, error } = await ctx.db.from("procedures").select("name, version, body, tools")
     .eq("is_active", true).order("name");
   if (error) throw error;
-  return data;
+  const testing = Object.entries(ctx.versions ?? {});
+  if (!testing.length) return data;
+  const tested = await Promise.all(testing.map(async ([name, version]) => {
+    const { data: row } = await ctx.db.from("procedures").select("name, version, body, tools")
+      .eq("name", name).eq("version", version).maybeSingle();
+    return row;
+  }));
+  const byName = new Map(data.map((p) => [p.name, p]));
+  for (const row of tested) if (row) byName.set(row.name, row);
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // A red-team version stays current only while the request is allowed to use it.
 async function currentProcedure(ctx: ToolContext): Promise<ProcedureRef | null> {
   const { current_procedure: name, current_version: version } = ctx.conv;
   if (!name || version === null) return null;
-  const { data } = await ctx.db.from("procedures").select("name, version, body, is_redteam")
+  const { data } = await ctx.db.from("procedures").select("name, version, body, tools, is_redteam")
     .eq("name", name).eq("version", version).single();
   if (data && (!data.is_redteam || ctx.redteam)) return data;
-  const { data: active } = await ctx.db.from("procedures").select("name, version, body")
-    .eq("name", name).eq("is_active", true).single();
+  const { data: active } = await ctx.db.from("procedures").select("name, version, body, tools")
+    .eq("name", name).eq("is_active", true).maybeSingle();
   return active;
 }
 
