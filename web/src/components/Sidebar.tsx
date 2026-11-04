@@ -1,6 +1,6 @@
 // The left nav, laid out like Decagon's: the workspace, then every section. Build, Analyze, Conversations, Versioning
 // and Preview open pages in this demo; the rest are shown for the full picture and don't navigate.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bookworm } from "./Bookworm";
 import { Icon } from "./Icon";
 
@@ -49,6 +49,10 @@ export function Sidebar({ section, page, email, onSignOut }: {
   onSignOut: () => void;
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({ build: true, analyze: true, test: true });
+  // Arriving in a section from anywhere (a Home suggestion, a link) opens it, so the current page shows highlighted.
+  useEffect(() => {
+    setOpen((o) => (o[section] ? o : { ...o, [section]: true }));
+  }, [section, page]);
 
   return (
     <aside className="sidebar">

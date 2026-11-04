@@ -50,10 +50,13 @@ export default function App() {
 function Page({ section, page, id, query }: { section: string; page: string; id?: string; query: URLSearchParams }) {
   if (section === "home") return <HomePage />;
   if (section === "test") return <TestSetsPage key={id ?? ""} name={page === "sets" ? id : undefined} />;
-  if (section === "build" && page === "aops") return id ? <AopDetailPage key={id} name={id} /> : <AopListPage />;
+  if (section === "build" && page === "aops") {
+    const from = query.get("from") ?? undefined;
+    return id ? <AopDetailPage key={`${id}:${from}`} name={id} suggestion={from} /> : <AopListPage />;
+  }
   if (section === "build" && page === "tools") return <ToolsPage />;
   if (section === "analyze" && page === "insights") return <InsightsPage />;
-  if (section === "analyze" && page === "watchtowers") return <WatchtowersPage />;
+  if (section === "analyze" && page === "watchtowers") return <WatchtowersPage initial={query.get("tower") ?? undefined} />;
   if (section === "conversations") return <ConversationsPage />;
   if (section === "versioning") return <VersioningPage />;
   if (section === "preview") {

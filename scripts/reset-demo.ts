@@ -15,6 +15,7 @@ const ORDERS: Record<string, { placed: number; delivered: number | null; estimat
   "BK-0987": { placed: 46, delivered: 41, estimated: 41 },
   "BK-1064": { placed: 3, delivered: 3, estimated: null },
   "BK-1060": { placed: 75, delivered: 70, estimated: 70 },
+  "BK-1072": { placed: 9, delivered: null, estimated: 3 }, // shipped, 3 days late: the late-orders demo
 };
 
 const ROOT = fromFileUrl(new URL("..", import.meta.url));
@@ -53,7 +54,7 @@ if (clearing) {
   const { error } = await db.from("returns").delete().in("order_item_id", returned.map((i) => i.id));
   if (error) fail(error.message);
 }
-console.log("Done. Piranesi and Circe are 12 days past delivery, The Overstory 41, Parable of the Sower 70.");
+console.log("Done. Piranesi and Circe are 12 days past delivery, The Overstory 41, Parable of the Sower 70; BK-1072 is 3 days late.");
 
 function fail(message: string): never {
   console.error(`Could not reset the demo data: ${message}`);

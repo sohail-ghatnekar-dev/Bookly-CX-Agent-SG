@@ -12,7 +12,8 @@ from (values
   ('BK-1051', 'maya.chen@example.com', now() - interval '1 day', 'processing', null, null, null, null, 3299),
   ('BK-0987', 'maya.chen@example.com', now() - interval '46 days', 'delivered', 'USPS', '9400111899223344556677', (now() - interval '41 days')::date, now() - interval '41 days', 3494),
   ('BK-1064', 'daniel.okafor@example.com', now() - interval '3 days', 'delivered', null, null, null, now() - interval '3 days', 1499),
-  ('BK-1060', 'daniel.okafor@example.com', now() - interval '75 days', 'delivered', 'USPS', '9400111899223344550011', (now() - interval '70 days')::date, now() - interval '70 days', 2298)
+  ('BK-1060', 'daniel.okafor@example.com', now() - interval '75 days', 'delivered', 'USPS', '9400111899223344550011', (now() - interval '70 days')::date, now() - interval '70 days', 2298),
+  ('BK-1072', 'daniel.okafor@example.com', now() - interval '9 days', 'shipped', 'USPS', '9400111899223344559988', (now() - interval '3 days')::date, null, 1899)
 ) as o(order_number, email, placed_at, status, carrier, tracking_number, estimated_delivery, delivered_at, total_cents)
 join customers c on c.email = o.email;
 
@@ -25,7 +26,8 @@ from (values
   ('BK-1051', 'BK-1051-1', 'Klara and the Sun', 'Kazuo Ishiguro', 'hardcover', 2800),
   ('BK-0987', 'BK-0987-1', 'The Overstory', 'Richard Powers', 'hardcover', 2995),
   ('BK-1064', 'BK-1064-1', 'Pachinko', 'Min Jin Lee', 'ebook', 1499),
-  ('BK-1060', 'BK-1060-1', 'Parable of the Sower', 'Octavia E. Butler', 'paperback', 1799)
+  ('BK-1060', 'BK-1060-1', 'Parable of the Sower', 'Octavia E. Butler', 'paperback', 1799),
+  ('BK-1072', 'BK-1072-1', 'Tomorrow, and Tomorrow, and Tomorrow', 'Gabrielle Zevin', 'paperback', 1899)
 ) as i(order_number, line_code, title, author, format, price_cents)
 join orders o on o.order_number = i.order_number;
 

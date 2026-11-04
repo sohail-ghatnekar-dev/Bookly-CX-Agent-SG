@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AopEditor } from "../components/AopEditor";
 import { ConversationLog } from "../components/ConversationLog";
 import { Icon } from "../components/Icon";
-import { api, type Overview, type SimResult, type Version } from "../lib/api";
+import { api, type Overview, type SimResult, type Version, type WatchtowerSummary } from "../lib/api";
+import { evidence, SUGGESTIONS } from "../lib/autopilot";
 import { ago, aopId, aopTitle, diffLines, joinAop, SCENARIO_NAMES, splitAop } from "../lib/format";
 import { aopRefs, metaRefs, toolRefs } from "../lib/refs";
 import { go } from "../lib/router";
@@ -26,24 +27,36 @@ const NEW_FORM: Form = {
 3. If the customer insists on something the rules don't allow, call @escalate_to_human with a summary and tell them a Bookly employee will follow up.`,
   note: "",
 };
+// Global logic runs on every channel. A channel can get its own variant; until then it uses Global.
 const CHANNELS = [
-  { id: "chat", label: "Chat", icon: "chat" },
-  { id: "email", label: "Email", icon: "mail" },
-  { id: "assist", label: "Agent Assist", icon: "person" },
-  { id: "voice", label: "Voice", icon: "phone" },
+  { id: "global", label: "Global", icon: "globe", hint: "Every channel", note: "" },
+  { id: "chat", label: "Chat", icon: "chat", hint: "Uses Global", note: "A chat variant could add quick-reply buttons for common answers." },
+  { id: "email", label: "Email", icon: "mail", hint: "Uses Global", note: "An email variant could add a greeting and sign-off, and answer every question in one reply." },
+  { id: "assist", label: "Agent Assist", icon: "person", hint: "Uses Global", note: "An Agent Assist variant would suggest replies to a Bookly employee instead of answering the customer." },
+  { id: "voice", label: "Voice", icon: "phone", hint: "Uses Global", note: "A voice variant could keep replies short and read order numbers back digit by digit." },
 ];
 
-export function AopDetailPage({ name }: { name: string }) {
+export function AopDetailPage({ name, suggestion }: { name: string; suggestion?: string }) {
   const creating = name === "new";
   const [overview, setOverview] = useState<Overview | null>(null);
   const [error, setError] = useState("");
-  const [form, setForm] = useState<Form>(NEW_FORM);
+  // A new AOP opened from an Autopilot suggestion starts from its draft, with the data behind it.
+  const autopilot = name === "new" ? SUGGESTIONS.find((x) => x.key === suggestion && x.draft) : undefined;
+  const [form, setForm] = useState<Form>(() => {
+    const d = autopilot?.draft;
+    return d ? { title: d.title, goal: d.goal, logic: d.logic, note: d.note } : NEW_FORM;
+  });
+  const [usage, setUsage] = useState<WatchtowerSummary | null>(null);
+  useEffect(() => {
+    if (autopilot) api.watchtower().then(setUsage).catch(() => {});
+  }, [autopilot]);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState<{ text: string; bad?: boolean } | null>(null);
   const [run, setRun] = useState<{ version: number; results: Record<string, Status> } | null>(null);
   const [logId, setLogId] = useState<string | null>(null);
   const [advanced, setAdvanced] = useState(false);
   const [channelOpen, setChannelOpen] = useState(false);
+  const [channel, setChannel] = useState("global");
   const [editing, setEditing] = useState(false); // while typing in the logic, half-typed references aren't errors yet
 
   const load = useCallback(async () => {
@@ -91,6 +104,7 @@ export function AopDetailPage({ name }: { name: string }) {
   if (!creating && !target) return <div className="empty">There's no AOP called {name}. <a href="#/build/aops">Back to AOPs</a></div>;
 
   const allTools = overview.tools;
+  const current = CHANNELS.find((c) => c.id === channel)!;
   const body = joinAop(form.goal, form.logic);
   const refs = toolRefs(body);
   const unknownTools = refs.filter((t) => !allTools.some((x) => x.name === t));
@@ -220,6 +234,7 @@ export function AopDetailPage({ name }: { name: string }) {
 
       <div className="aop-layout">
         <div className="aop-col">
+          {autopilot && <AutopilotBanner suggestion={autopilot} usage={usage} />}
           <div className="card">
             <h2>What is this AOP used for?</h2>
             <p className="muted small">The agent reads this to decide when to use the AOP.</p>
@@ -233,16 +248,21 @@ export function AopDetailPage({ name }: { name: string }) {
               <span className="spacer" />
               <div className="channel" onMouseLeave={() => setChannelOpen(false)}>
                 <button className="channel-btn" aria-expanded={channelOpen} onClick={() => setChannelOpen((o) => !o)}>
-                  <Icon name="globe" />Global<Icon name="down" size={14} />
+                  <Icon name={current.icon} />{current.label}<Icon name="down" size={14} />
                 </button>
                 {channelOpen && (
                   <div className="channel-menu" role="menu">
-                    <button role="menuitem" onClick={() => setChannelOpen(false)}><Icon name="globe" />Global<span className="hint">Every channel</span></button>
                     {CHANNELS.map((c) => (
-                      <button key={c.id} role="menuitem" disabled title="Channel variants aren't part of this demo"><Icon name={c.icon} />{c.label}<span className="hint">Uses Global</span></button>
+                      <button key={c.id} role="menuitemradio" aria-checked={c.id === channel} className={c.id === channel ? "on" : ""}
+                        onClick={() => {
+                          setChannel(c.id);
+                          setChannelOpen(false);
+                        }}>
+                        <Icon name={c.icon} />{c.label}<span className="hint">{c.hint}</span>
+                      </button>
                     ))}
                     <hr />
-                    <button disabled><Icon name="plus" />Add variant</button>
+                    <button disabled title="Channel variants aren't part of this POC"><Icon name="plus" />Add variant</button>
                   </div>
                 )}
               </div>
@@ -255,6 +275,11 @@ export function AopDetailPage({ name }: { name: string }) {
                 Written once, this AOP works the same on every channel.
               </span>
             </div>
+            {current.id !== "global" && (
+              <div className="notice" style={{ marginBottom: 12 }}>
+                <b>{current.label}</b> uses the Global logic below, since it has no variant of its own. {current.note}
+              </div>
+            )}
             <div onFocus={() => setEditing(true)} onBlur={() => setEditing(false)}>
               <AopEditor value={form.logic} onChange={(logic) => edit({ logic })} tools={allTools} aops={aops} metadata={overview.metadata} />
             </div>
@@ -409,6 +434,33 @@ export function AopDetailPage({ name }: { name: string }) {
         </div>
       </div>
       {logId && <ConversationLog id={logId} onClose={() => setLogId(null)} />}
+    </div>
+  );
+}
+
+// Why Autopilot suggested this AOP: the chats behind it, from the last 30 days, and what's left to write.
+function AutopilotBanner({ suggestion, usage }: { suggestion: (typeof SUGGESTIONS)[number]; usage: WatchtowerSummary | null }) {
+  const e = usage ? evidence(usage, suggestion) : null;
+  return (
+    <div className="card autopilot-card">
+      <div className="row">
+        <span className="tag"><Icon name="autopilot" size={12} />Optimization</span>
+        <span className="tag">AOP</span>
+        <span className="muted small">Suggested by Autopilot from your last {e?.days ?? 30} days of chats</span>
+      </div>
+      <h2 style={{ margin: "8px 0 6px" }}>{suggestion.title}</h2>
+      {!e ? <p className="muted small">Loading the data behind this suggestion…</p> : (
+        <div className="evidence">
+          <div><b>{e.count}</b><span>{suggestion.category.toLowerCase()} chats</span></div>
+          <div><b>{e.handed}</b><span>reached a person ({100 - e.deflection}%){e.lowest ? ", the lowest deflection of any topic" : ""}</span></div>
+          {e.watchtower && <div><b>{e.watchtower.count}</b><span>caught by the “{e.watchtower.name}” watchtower</span></div>}
+          <div><b className="gain">+{e.gain}</b><span>contained conversations a week if half stay with the agent</span></div>
+        </div>
+      )}
+      <div className="row" style={{ marginTop: 10, flexWrap: "wrap" }}>
+        <span className="finish">{suggestion.draft!.finish}</span>
+        {suggestion.watchtower && <a className="link small" href={`#/analyze/watchtowers?tower=${suggestion.watchtower}`}>See the conversations</a>}
+      </div>
     </div>
   );
 }

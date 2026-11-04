@@ -46,7 +46,7 @@ export function ToolsPage() {
                   <td className="tool-row-guard">{GUARDRAILS[t.name] ?? "–"}</td>
                   <td>
                     {t.always_on ? <span className="pill info">Every AOP</span> : users.length ? (
-                      <div className="ref-list">{users.map((v) => <a key={v.name} className="mono ref-aop" style={{ padding: "1px 6px", textDecoration: "none" }} href={`#/build/aops/${v.name}`}>#{v.title ?? aopTitle(v.name)}</a>)}</div>
+                      <div className="ref-list">{users.map((v) => <a key={v.name} className="mono ref-aop chip-ref" href={`#/build/aops/${v.name}`} title={v.title ?? aopTitle(v.name)}>#{v.name}</a>)}</div>
                     ) : <span className="muted">–</span>}
                   </td>
                 </tr>

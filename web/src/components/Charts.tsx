@@ -2,12 +2,13 @@
 // labelled around its edge, and indigo gradient bars. Every chart reads out its values on hover.
 import { useEffect, useId, useRef, useState } from "react";
 import { DONUT, OTHER_SLICE, RATING } from "../lib/colors";
+import { Info } from "./Info";
 
 export function Stat({ value, label, hint }: { value: string; label: string; hint?: string }) {
   return (
     <div className="stat">
       <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}{hint && <span className="info-dot small-dot" title={hint}>i</span>}</div>
+      <div className="stat-label">{label}{hint && <Info text={hint} />}</div>
     </div>
   );
 }

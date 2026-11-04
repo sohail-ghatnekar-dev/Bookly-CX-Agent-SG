@@ -5,10 +5,10 @@ import { ConversationLog } from "../components/ConversationLog";
 import { api, type WatchtowerSummary } from "../lib/api";
 import { ago } from "../lib/format";
 
-export function WatchtowersPage() {
+export function WatchtowersPage({ initial }: { initial?: string }) {
   const [s, setS] = useState<WatchtowerSummary | null>(null);
   const [error, setError] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initial ?? null);
   const [logId, setLogId] = useState<string | null>(null);
 
   useEffect(() => {

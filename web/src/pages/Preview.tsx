@@ -2,6 +2,7 @@
 // Live AOPs by default, or one draft in place of its live version. Chat only in this demo.
 import { useEffect, useState } from "react";
 import { ChatLab } from "../components/ChatLab";
+import { Info } from "../components/Info";
 import { TestCustomers } from "../components/TestCustomers";
 import { api, type Version } from "../lib/api";
 import { aopTitle } from "../lib/format";
@@ -23,7 +24,7 @@ export function PreviewPage({ testing }: { testing?: { name: string; version: nu
     <div className="page">
       <div className="page-head">
         <h1>Preview</h1>
-        <span className="info-dot" title="Talk to the agent exactly as customers will, and see why it does what it does.">i</span>
+        <Info text="Talk to the agent exactly as customers will, and see every step it takes and why." />
       </div>
       <div className="tabs" role="tablist">
         {CHANNELS.map((c) => (

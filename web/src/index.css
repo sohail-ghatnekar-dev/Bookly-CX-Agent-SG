@@ -156,6 +156,7 @@ table.log { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .channel-menu button { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; border-radius: 8px; padding: 8px 10px; text-align: left; font-size: 14px; }
 .channel-menu button:not(:disabled):hover { background: var(--hover); }
 .channel-menu .hint { margin-left: auto; font-size: 11.5px; color: var(--faint); }
+.channel-menu button.on { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
 .channel-menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 
 /* The AOP Logic editor: a textarea over a copy of its text with the @tool and #aop references coloured in. */
@@ -210,6 +211,7 @@ table.log { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 
 /* Tools */
 .tool-row-guard { color: var(--muted); font-size: 13px; }
+.chip-ref { padding: 1px 6px; text-decoration: none; white-space: nowrap; }
 
 /* Preview */
 .preview-card { display: flex; flex-direction: column; gap: 14px; }
@@ -298,6 +300,11 @@ table.log { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .home-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .glance { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .glance .stat { background: #f7f7f9; border: 0; }
+.info-hint { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; border-radius: 50%; border: 1.3px solid #9a9aa6; color: #7a7a86; font: 700 9.5px/1 Inter, sans-serif; vertical-align: 1px; cursor: help; text-transform: none; letter-spacing: 0; }
+.info-hint:hover, .info-hint:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+.info-tip { position: absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%); width: 250px; padding: 9px 11px; border-radius: 9px; background: #1b1b22; color: #fff; font: 400 12.5px/1.45 Inter, sans-serif; text-align: left; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2); opacity: 0; visibility: hidden; transition: opacity 0.12s; z-index: 20; pointer-events: none; }
+.info-tip::before { content: ""; position: absolute; top: -5px; left: 50%; margin-left: -5px; border: 5px solid transparent; border-top: 0; border-bottom-color: #1b1b22; }
+.info-hint:hover .info-tip, .info-hint:focus-visible .info-tip { opacity: 1; visibility: visible; }
 .small-dot { width: 13px; height: 13px; font-size: 9px; margin: 0 0 0 6px; vertical-align: 1px; cursor: help; }
 .section-title { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--muted); font-weight: 500; }
 .suggestions { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
@@ -306,6 +313,14 @@ table.log { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .suggestion h3 { margin: 0; font-size: 14.5px; }
 .suggestion .foot { display: flex; gap: 14px; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; font-size: 12.5px; color: var(--muted); }
 .suggestion .gain { color: var(--ok); font-weight: 500; }
+.autopilot-card { border-color: #cfcaf8; background: linear-gradient(180deg, #f7f6ff, #ffffff 70%); }
+.evidence { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.evidence div { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.evidence b { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+.evidence span { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+.evidence .gain { color: var(--ok); }
+.finish { font-size: 13px; font-weight: 600; color: #8a4b08; background: var(--warn-soft); border-radius: 7px; padding: 3px 9px; }
+@media (max-width: 1000px) { .evidence { grid-template-columns: 1fr 1fr; } }
 .tag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
 @media (max-width: 1200px) {
   .home-grid, .home-grid-3, .detail-grid { grid-template-columns: 1fr; }
