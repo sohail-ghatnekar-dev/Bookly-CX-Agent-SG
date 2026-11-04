@@ -37,3 +37,6 @@ verify_jwt = true
 
 [functions.watchtower]
 verify_jwt = true
+
+[functions.console]
+verify_jwt = true

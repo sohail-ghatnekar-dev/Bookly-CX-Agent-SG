@@ -4,9 +4,9 @@
 SECRET_PATTERNS := sk[-]ant-|sb[_]secret_|InNlcnZpY2Vfcm9[s]|ZXJ2aWNlX3JvbGU[i]|c2VydmljZV9yb2x[l]
 
 IGNORED := .env .env.local supabase/.env supabase/.env.hosted evals/.env evals/.env.remote \
-	ios/Bookly/Config.xcconfig supabase/.temp/x evals/results/latest.json
+	ios/Bookly/Config.xcconfig supabase/.temp/x evals/results/latest.json web/.env.local web/node_modules/x web/dist/x
 NOT_IGNORED := supabase/.env.example evals/.env.example evals/results/.gitkeep \
-	ios/Bookly/Config.example.xcconfig
+	ios/Bookly/Config.example.xcconfig web/.env.example
 
 # Checks files, variables, and ignore rules. Prints names only, never values.
 doctor:

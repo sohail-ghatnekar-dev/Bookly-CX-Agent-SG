@@ -50,5 +50,6 @@ export interface ToolContext {
   conv: Conversation;
   trace: Trace;
   redteam: boolean;
+  versions?: Record<string, number>; // AOP versions under test in a simulation, by name
   escalation?: Escalation;
 }

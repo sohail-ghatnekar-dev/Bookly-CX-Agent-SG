@@ -45,14 +45,14 @@ type Event = ConversationRow["trace_events"][number];
 const CONTROLS: { key: string; name: string; what: string; match?: (e: Event) => boolean }[] = [
   {
     key: "verify_failed",
-    name: "Wrong email or ZIP",
+    name: "Wrong order number or email",
     what: "Identity check said no; nothing shared",
     match: (e) => e.label === "verify_customer" && e.outcome === "denied",
   },
   { key: "return_blocked", name: "Return blocked in code", what: "initiate_return re-checked the rules and refused" },
-  { key: "verification_required", name: "Verification required", what: "Order tool called before email + ZIP" },
+  { key: "verification_required", name: "Verification required", what: "Order tool called before verification" },
   { key: "ownership", name: "Someone else's order", what: "Order exists but isn't this customer's" },
-  { key: "lockout", name: "Verification lockout", what: "3 wrong email + ZIP attempts" },
+  { key: "lockout", name: "Verification lockout", what: "3 wrong order number + email attempts" },
   { key: "invalid_citation", name: "Made-up policy cited", what: "Cited an ID not in policy_docs" },
   { key: "unsupported_claim", name: "Return claimed, no RMA", what: "Reply says a return happened; no tool did it" },
   { key: "refusal", name: "Model refused", what: "Claude declined; canned reply sent" },

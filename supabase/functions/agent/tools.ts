@@ -30,10 +30,10 @@ export const TOOL_DEFS: Tool[] = [
   },
   {
     name: "verify_customer",
-    description: "Verify identity with the account email and the ZIP code on the order.",
-    input_schema: obj({ email: str("Account email"), postal_code: str("ZIP code") }, [
+    description: "Verify identity with an order number and the email on that order.",
+    input_schema: obj({ order_number: str("Order number, e.g. BK-1042"), email: str("Email on the order") }, [
+      "order_number",
       "email",
-      "postal_code",
     ]),
   },
   {
@@ -141,13 +141,18 @@ const HANDLERS: Record<string, (ctx: ToolContext, input: Input) => Promise<Resul
     if (ctx.conv.verify_failures >= MAX_VERIFY_FAILURES) {
       return fail({ ok: false, locked: true }, { kind: "guard", label: "lockout", detail: "too many attempts", outcome: "blocked" });
     }
+    // The order number must exist and its email must match; a wrong pair says nothing about which part was wrong.
+    const orderNumber = String(input.order_number ?? "").trim().toUpperCase();
     const email = String(input.email ?? "").trim().toLowerCase();
-    const zip = String(input.postal_code ?? "").trim();
-    const { data: customer } = await ctx.db.from("customers").select("id, name")
-      .eq("email", email).eq("postal_code", zip).maybeSingle();
-    if (customer) {
+    const { data: order } = await ctx.db.from("orders").select("order_number, customers!inner(id, name, email)")
+      .eq("order_number", orderNumber).maybeSingle();
+    const customer = order?.customers as unknown as { id: string; name: string; email: string } | undefined;
+    if (customer && customer.email.toLowerCase() === email) {
       await updateConversation(ctx, { verified_customer_id: customer.id });
-      return ok({ ok: true, first_name: customer.name.split(" ")[0] }, { kind: "tool", label, detail: "ok", outcome: "ok" });
+      return ok(
+        { ok: true, first_name: customer.name.split(" ")[0], order_number: orderNumber },
+        { kind: "tool", label, detail: "ok", outcome: "ok" },
+      );
     }
     const failures = ctx.conv.verify_failures + 1;
     await updateConversation(ctx, { verify_failures: failures });
@@ -368,11 +373,17 @@ function describe(d: ReturnDecision): string {
   return `${d.eligible ? "eligible" : "denied"} ${d.rule_id}${days}`;
 }
 
+// The active version, unless a simulation is testing a draft or the red-team version is allowed.
 async function loadProcedure(ctx: ToolContext, name: string) {
   const useRedteam = ctx.redteam && name === "returns";
+  const testing = ctx.versions?.[name];
   const query = ctx.db.from("procedures").select("name, version, body").eq("name", name);
-  const { data, error } = await (useRedteam ? query.eq("is_redteam", true) : query.eq("is_active", true))
-    .order("version", { ascending: false }).limit(1).single();
+  const scoped = testing !== undefined
+    ? query.eq("version", testing)
+    : useRedteam
+    ? query.eq("is_redteam", true)
+    : query.eq("is_active", true);
+  const { data, error } = await scoped.order("version", { ascending: false }).limit(1).single();
   if (error) throw error;
   return data as { name: string; version: number; body: string };
 }

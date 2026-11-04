@@ -41,7 +41,7 @@ function offersEmployee(reply: string): boolean {
   );
 }
 
-// Email and ZIP are typed, so everything else waits until the customer is verified.
+// The order number and email are typed, so everything else waits until the customer is verified.
 function forVerified(s: SuggestionInput): string[] {
   const check = s.events.findLast((e) => e.label === "eligibility");
   const started = check &&

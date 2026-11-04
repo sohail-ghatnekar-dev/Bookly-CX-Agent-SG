@@ -1,5 +1,6 @@
 // POST /watchtower → how the agent is doing over the last 30 days: volume, topics, handoffs, controls fired.
-// Counts only, no customer details. Reads every chat, so it uses the service role, never the caller's.
+// Counts only, no customer details. Reads every live chat (console simulations are left out), so it uses
+// the service role, never the caller's.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { type ConversationRow, summarize } from "./stats.ts";
 
@@ -12,10 +13,16 @@ const db = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+// The console website calls this from a browser, so it answers CORS preflights.
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+};
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...CORS } });
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   // Any signed-in session can read the summary. A real deployment would check an admin role here.
@@ -30,7 +37,7 @@ Deno.serve(async (req) => {
         "id, status, current_procedure, created_at, messages(turn, role), escalations(reason, rule_ids, created_at), " +
           "trace_events(kind, label, detail, outcome, rule_id, created_at)",
       )
-      .gte("created_at", since).order("created_at", { ascending: false }).limit(MAX_CONVERSATIONS);
+      .eq("source", "live").gte("created_at", since).order("created_at", { ascending: false }).limit(MAX_CONVERSATIONS);
     if (error) throw error;
 
     const { data: evalRun } = await db.from("eval_runs").select("model, total, passed, resolved, escalated, ran_at")
