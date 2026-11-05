@@ -204,6 +204,18 @@ const ACTIONS: Record<string, Action> = {
     return out.body;
   },
 
+  // The test phone's "How helpful was this?" stars. Only test chats can be rated here, so live CSAT stays the customers'.
+  async rate(_user, input) {
+    const id = String(input.conversation_id ?? "");
+    const rating = Number(input.rating);
+    if (!UUID.test(id)) throw new Refusal("Unknown conversation", 404);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new Refusal("Ratings are 1 to 5 stars.");
+    const { data, error } = await db.from("conversations").update({ csat: rating }).eq("id", id).eq("source", "test").select("id");
+    if (error) throw error;
+    if (!data?.length) throw new Refusal("Unknown conversation", 404);
+    return { conversation_id: id, rating };
+  },
+
   // Starts a test of one version; the console then runs each scenario with run_scenario.
   async run_start(user, input) {
     const { name, version } = await versionOf(input);
@@ -361,7 +373,7 @@ const ACTIONS: Record<string, Action> = {
   async conversation(_user, input) {
     const id = String(input.id ?? "");
     const { data: conv } = await db.from("conversations")
-      .select("id, created_at, status, source, current_procedure, current_version, verified_customer_id").eq("id", id).maybeSingle();
+      .select("id, created_at, status, source, current_procedure, current_version, verified_customer_id, csat").eq("id", id).maybeSingle();
     if (!conv) throw new Refusal("Unknown conversation", 404);
     const [{ data: messages }, { data: trace }] = await Promise.all([
       db.from("messages").select("turn, seq, role, content").eq("conversation_id", id).order("seq"),

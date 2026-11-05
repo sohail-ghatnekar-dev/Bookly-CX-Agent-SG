@@ -117,10 +117,11 @@ export interface TraceStep {
   ms: number;
   input: unknown;
   output: unknown;
+  created_at: string;
 }
 
 export interface ConversationDetail {
-  conversation: { id: string; created_at: string; status: string; source: string; current_procedure: string | null; current_version: number | null; verified: boolean };
+  conversation: { id: string; created_at: string; status: string; source: string; current_procedure: string | null; current_version: number | null; verified: boolean; csat: number | null };
   messages: { turn: number; role: string; text: string; sent: boolean }[];
   trace: TraceStep[];
 }
@@ -236,6 +237,7 @@ export const api = {
   retire: (name: string) => consoleCall<{ version: number }>("retire", { name }),
   chat: (message: string, conversationId: string | null, testing?: { name: string; version: number }) =>
     consoleCall<ChatReply>("chat", { message, conversation_id: conversationId, testing }),
+  rate: (conversationId: string, rating: number) => consoleCall<{ rating: number }>("rate", { conversation_id: conversationId, rating }),
   runStart: (name: string, version: number) => consoleCall<{ run_id: string; scenarios: string[] }>("run_start", { name, version }),
   runScenario: (runId: string, scenarioId: string) => consoleCall<SimResult>("run_scenario", { run_id: runId, scenario_id: scenarioId }),
   runGet: (runId: string) => consoleCall<{ run: { id: string; created_at: string; started_by: string; version: number }; results: SimResult[] }>("run_get", { run_id: runId }),

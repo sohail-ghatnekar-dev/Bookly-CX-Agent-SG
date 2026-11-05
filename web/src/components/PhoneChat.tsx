@@ -18,10 +18,11 @@ const PHRASES = [
   "Looking it up in the ledger…",
   "Dusting off the records…",
 ];
-export function PhoneChat({ testing, onReply, onNewConversation }: {
+export function PhoneChat({ testing, onReply, onNewConversation, onRated }: {
   testing?: { name: string; version: number };
   onReply?: (reply: ChatReply) => void;
   onNewConversation?: () => void;
+  onRated?: () => void;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -33,12 +34,13 @@ export function PhoneChat({ testing, onReply, onNewConversation }: {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [escalation, setEscalation] = useState<Escalation | null>(null);
   const [escalated, setEscalated] = useState(false);
+  const [rating, setRating] = useState<number | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = scroller.current;
     el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [turns, sending, suggestions, escalated, error]);
+  }, [turns, sending, suggestions, escalated, error, rating]);
 
   function newConversation() {
     setTurns([]);
@@ -46,6 +48,7 @@ export function PhoneChat({ testing, onReply, onNewConversation }: {
     setSuggestions([]);
     setEscalation(null);
     setEscalated(false);
+    setRating(null);
     setError(null);
     setFailed(null);
     onNewConversation?.();
@@ -88,6 +91,19 @@ export function PhoneChat({ testing, onReply, onNewConversation }: {
     el.style.height = `${Math.min(full, 132)}px`;
     el.style.overflowY = full > 132 ? "auto" : "hidden";
   }, [draft]);
+
+  // One rating per chat, saved as its CSAT. The log picks it up on its next reload.
+  async function rate(stars: number) {
+    if (!conversationId || rating) return;
+    setRating(stars);
+    try {
+      await api.rate(conversationId, stars);
+      onRated?.();
+    } catch (e) {
+      setRating(null);
+      setError((e as Error).message || "Couldn't save the rating.");
+    }
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -158,6 +174,19 @@ export function PhoneChat({ testing, onReply, onNewConversation }: {
               </div>
             ))}
             {sending && <Typing />}
+            {!sending && conversationId && turns.some((t) => t.reply !== undefined) && (
+              <div className="p-indent p-rate">
+                <span className="p-rate-label">{rating ? "Thanks for the feedback" : "How helpful was this?"}</span>
+                <div className="p-stars" role="radiogroup" aria-label="How helpful was this?">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button key={n} role="radio" aria-checked={rating === n} aria-label={`${n} star${n > 1 ? "s" : ""}`}
+                      className={rating && n <= rating ? "on" : ""} disabled={!!rating} onClick={() => rate(n)}>
+                      {rating && n <= rating ? "★" : "☆"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {!sending && !escalated && !error && suggestions.length > 0 && (
               <div className="p-indent p-suggestions">
                 {suggestions.map((s) => <button key={s} className="p-chip" onClick={() => send(s)}>{s}</button>)}
@@ -170,6 +199,7 @@ export function PhoneChat({ testing, onReply, onNewConversation }: {
               </div>
             )}
             {escalated && escalation && <HandoffCard escalation={escalation} onNewChat={newConversation} />}
+            <p className="p-privacy">By using this chat, you agree to your data being processed as described in Bookly's <a href="#/preview" onClick={(e) => e.preventDefault()}>Privacy Policy</a>.</p>
           </div>
 
           <form className="p-input" onSubmit={submit}>

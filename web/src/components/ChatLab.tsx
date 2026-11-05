@@ -16,6 +16,7 @@ export function ChatLab({ testing, onReply }: {
       <PhoneChat
         testing={testing}
         onNewConversation={() => setConversationId(null)}
+        onRated={() => setRefresh((n) => n + 1)}
         onReply={(r) => {
           setConversationId(r.conversation_id);
           setRefresh((n) => n + 1);
