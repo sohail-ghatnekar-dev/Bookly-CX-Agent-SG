@@ -26,6 +26,7 @@ export function PhoneChat({ testing, onReply, onNewConversation }: {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const box = useRef<HTMLTextAreaElement>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -77,6 +78,14 @@ export function PhoneChat({ testing, onReply, onNewConversation }: {
       setSending(false);
     }
   }
+
+  // The message box grows with what's typed, up to a few lines, instead of scrolling sideways.
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+  }, [draft]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -162,12 +171,18 @@ export function PhoneChat({ testing, onReply, onNewConversation }: {
           </div>
 
           <form className="p-input" onSubmit={submit}>
-            <input
+            <textarea
+              ref={box}
+              rows={1}
               value={draft}
               disabled={escalated}
               placeholder={escalated ? "A Bookly employee has your case" : "Write a message"}
               maxLength={1000}
               onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter sends, like the app; Shift+Enter starts a new line.
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) submit(e);
+              }}
               aria-label="Message"
             />
             <button type="submit" className="p-send" aria-label="Send" disabled={escalated || sending || !draft.trim()}>

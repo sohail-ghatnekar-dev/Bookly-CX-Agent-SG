@@ -8,6 +8,7 @@ import type { ToolContext } from "./types.ts";
 Deno.test("routing and handoff are always on; the rest belong to AOPs", () => {
   assertEquals(ALWAYS_ON, ["select_procedure", "escalate_to_human"]);
   assertEquals(AOP_TOOLS.includes("initiate_return"), true);
+  assertEquals(AOP_TOOLS.includes("schedule_follow_up"), true);
   assertEquals(AOP_TOOLS.some((t) => ALWAYS_ON.includes(t)), false);
 });
 

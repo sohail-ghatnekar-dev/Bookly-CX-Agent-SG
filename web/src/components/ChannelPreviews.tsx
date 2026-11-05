@@ -11,9 +11,9 @@ const CALL: { who: "agent" | "customer"; text: string }[] = [
   { who: "customer", text: "Hi, yeah, my order still hasn't shown up. It was supposed to be here a few days ago." },
   { who: "agent", text: "I'm sorry about that, I can look into it. What's the order number, and the email address on the order?" },
   { who: "customer", text: "It's B K one zero seven two, and the email is daniel dot okafor at example dot com." },
-  { who: "agent", text: "Thanks, Daniel, you're verified. Order BK-1072, Tomorrow, and Tomorrow, and Tomorrow, is with USPS and it's three days past its estimate. Most late parcels arrive within two business days of a missed estimate. Would you like me to check the tracking again tomorrow and let you know?" },
+  { who: "agent", text: "Thanks, Daniel, you're verified. Order BK-1072, Tomorrow, and Tomorrow, and Tomorrow, is with USPS and it's three days past its estimate. Most late parcels arrive within two business days of a missed estimate. Would you like me to email you an update tomorrow morning, so you don't have to call back?" },
   { who: "customer", text: "Yes please, that would be great." },
-  { who: "agent", text: "Done. I'll check tomorrow morning and text you an update. Is there anything else I can help with?" },
+  { who: "agent", text: "Done. You'll get an email tomorrow at 9 AM Eastern, at the address on your account, with the latest from USPS. Is there anything else I can help with?" },
   { who: "customer", text: "No, that's it. Thanks." },
   { who: "agent", text: "Happy reading, Daniel. Goodbye." },
 ];

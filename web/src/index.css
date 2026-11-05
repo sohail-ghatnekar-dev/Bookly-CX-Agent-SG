@@ -510,9 +510,9 @@ table.log { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .p-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .p-label { font-size: 15px; text-align: right; }
 .p-input { flex: none; display: flex; align-items: flex-end; gap: 10px; padding: 10px 16px; background: var(--p-paper); border-top: 0.5px solid var(--p-hairline); }
-.p-input input { flex: 1; min-width: 0; font: 17px var(--p-serif); color: var(--p-ink); background: var(--p-card); border: 0.5px solid var(--p-hairline); border-radius: 18px; padding: 10px 14px; }
-.p-input input:focus { outline: none; }
-.p-input input::placeholder { color: #b3aa98; }
+.p-input textarea { flex: 1; min-width: 0; font: 17px/1.3 var(--p-serif); color: var(--p-ink); background: var(--p-card); border: 0.5px solid var(--p-hairline); border-radius: 18px; padding: 10px 14px; resize: none; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.p-input textarea:focus { outline: none; }
+.p-input textarea::placeholder { color: #b3aa98; }
 .p-send { width: 36px; height: 36px; flex: none; border-radius: 50%; border: 0; background: var(--p-ink); color: var(--p-paper); display: grid; place-items: center; margin-bottom: 3px; }
 .p-send:disabled { opacity: 0.35; }
 .p-home { height: 30px; flex: none; display: grid; place-items: center; background: var(--p-paper); }

@@ -15,7 +15,7 @@ export const SUGGESTIONS: Suggestion[] = [
   {
     key: "late_delivery",
     category: "Late delivery",
-    title: "New AOP: late orders, with a carrier update before any handoff",
+    title: "New AOP: late orders, answered with a carrier update and a scheduled follow-up",
     target: "new",
     watchtower: "late_order",
     draft: {
@@ -23,11 +23,11 @@ export const SUGGESTIONS: Suggestion[] = [
       goal: "Use this AOP when a customer's order is past its estimated delivery date, or they say it's late.",
       logic: `1. Verify identity first with @verify_customer: the order number and the email on that order. Same rules as #order_status.
 2. Call @get_order_status. If the order isn't late, switch to #order_status.
-3. Apologize once, using {{ customer.first_name }}, then give the carrier, the tracking number and the new estimate in plain words.
-4. Most late parcels arrive within 2 business days of a missed estimate. Say so, and offer to check again tomorrow.
+3. Apologize once, using {{ customer.first_name }}, then give the carrier, the tracking number and the date it was expected, in plain words.
+4. Most late parcels arrive within 2 business days of a missed estimate. Say so, and offer to email them an update so they don't have to check back.
 5. `,
       note: "Suggested by Autopilot: late-delivery chats",
-      finish: "Finish step 5: when should a person take over?",
+      finish: "Finish step 5: schedule the follow-up, so no one has to step in.",
     },
   },
   {

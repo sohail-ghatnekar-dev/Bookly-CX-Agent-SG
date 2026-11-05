@@ -6,6 +6,7 @@ import type { NewEvent } from "./trace.ts";
 import type { ContentBlock, ToolContext } from "./types.ts";
 
 const MAX_VERIFY_FAILURES = 3;
+const FOLLOW_UP_WHEN = ["tomorrow_morning", "in_2_days", "in_3_days"];
 const REASONS = ["damaged_defective", "changed_mind"];
 
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
@@ -63,6 +64,16 @@ export const TOOL_DEFS: Tool[] = [
     name: "get_policy",
     description: "Bookly policy documents: shipping, returns, refunds, account help, support hours.",
     input_schema: obj({}),
+  },
+  {
+    name: "schedule_follow_up",
+    description:
+      "Schedule an email to the verified customer with an update on one of their orders, for when they'd rather hear back later than wait. Returns when it will be sent and where.",
+    input_schema: obj({
+      order_number: str("Order number, e.g. BK-1072"),
+      when: { type: "string", enum: FOLLOW_UP_WHEN, description: "When to send the update" },
+      note: str("What the update should cover, e.g. the new delivery estimate"),
+    }, ["order_number", "when"]),
   },
   {
     name: "escalate_to_human",
@@ -277,6 +288,43 @@ const HANDLERS: Record<string, (ctx: ToolContext, input: Input) => Promise<Resul
     return ok({ docs: data }, { kind: "tool", label: "get_policy", detail: `${data.length} docs`, outcome: "ok" });
   },
 
+  // One email update per order at a time, to the address on the verified account, sent at 9am Eastern.
+  async schedule_follow_up(ctx, input) {
+    const label = "schedule_follow_up";
+    const customerId = ctx.conv.verified_customer_id;
+    if (!customerId) return notVerified(label);
+    const order = await findOrder(ctx, String(input.order_number ?? ""), customerId);
+    if ("denied" in order) return order.denied;
+    const when = FOLLOW_UP_WHEN.includes(String(input.when)) ? String(input.when) : "tomorrow_morning";
+    const days = when === "in_3_days" ? 3 : when === "in_2_days" ? 2 : 1;
+    const sendAt = new Date();
+    sendAt.setUTCDate(sendAt.getUTCDate() + days);
+    sendAt.setUTCHours(14, 0, 0, 0); // 9am Eastern
+    const { data: customer } = await ctx.db.from("customers").select("email").eq("id", customerId).single();
+    const to = maskEmail(customer?.email ?? "");
+    const { data: pending } = await ctx.db.from("follow_ups").select("send_at")
+      .eq("order_number", order.row.order_number).gt("send_at", new Date().toISOString()).limit(1).maybeSingle();
+    if (pending) {
+      return ok(
+        { ok: true, already_scheduled: true, channel: "email", to, send_at: pending.send_at },
+        { kind: "tool", label, detail: `${order.row.order_number} already scheduled`, outcome: "ok" },
+      );
+    }
+    const { error } = await ctx.db.from("follow_ups").insert({
+      conversation_id: ctx.conv.id,
+      customer_id: customerId,
+      order_number: order.row.order_number,
+      send_at: sendAt.toISOString(),
+      note: String(input.note ?? "").trim().slice(0, 200),
+    });
+    if (error) throw error;
+    const day = sendAt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/New_York" });
+    return ok(
+      { ok: true, channel: "email", to, send_at: sendAt.toISOString(), send_at_text: `${day} at 9:00 AM Eastern` },
+      { kind: "tool", label, detail: `${order.row.order_number} email ${sendAt.toISOString().slice(0, 10)}`, outcome: "ok" },
+    );
+  },
+
   async escalate_to_human(ctx, input) {
     const summary = String(input.summary ?? "").trim();
     const reason = String(input.reason ?? "").trim();
@@ -314,6 +362,12 @@ const HANDLERS: Record<string, (ctx: ToolContext, input: Input) => Promise<Resul
 };
 
 // --- helpers ---
+
+// "daniel.okafor@example.com" → "d•••@example.com", so a reply never spells out the full address.
+function maskEmail(email: string): string {
+  const [user, domain] = email.split("@");
+  return user && domain ? `${user[0]}•••@${domain}` : "the email on the account";
+}
 
 function notVerified(tool: string): Result {
   return fail(

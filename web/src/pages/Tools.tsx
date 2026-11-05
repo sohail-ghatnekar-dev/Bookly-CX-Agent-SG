@@ -14,6 +14,7 @@ const GUARDRAILS: Record<string, string> = {
   check_return_eligibility: "Return windows live in code: 30 days to change your mind, 60 if damaged, never ebooks, delivered orders only.",
   initiate_return: "Re-runs the eligibility check before it issues an RMA, so no AOP can approve an out-of-policy return. One return per item.",
   get_policy: "Answers come from Bookly's policy documents. Cited IDs are checked against them.",
+  schedule_follow_up: "Verified customer and their own order only. Emails the address on the account, never one typed in chat. One pending follow-up per order.",
   escalate_to_human: "Needs a summary. The case goes to an employee with every rule that applied.",
 };
 
@@ -26,6 +27,7 @@ const OWNERS: Record<string, { creator: string; updated: string }> = {
   check_return_eligibility: { creator: "returns-eng@bookly.com", updated: "2026-10-28T17:10:00Z" },
   initiate_return: { creator: "returns-eng@bookly.com", updated: "2026-10-28T17:30:00Z" },
   get_policy: { creator: "cx-ops@bookly.com", updated: "2026-10-22T14:00:00Z" },
+  schedule_follow_up: { creator: "orders-eng@bookly.com", updated: "2026-11-02T16:45:00Z" },
   escalate_to_human: { creator: "platform@bookly.com", updated: "2026-10-23T19:15:00Z" },
 };
 
