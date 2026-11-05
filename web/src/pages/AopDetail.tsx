@@ -27,13 +27,13 @@ const NEW_FORM: Form = {
 3. If the customer insists on something the rules don't allow, call @escalate_to_human with a summary and tell them a Bookly employee will follow up.`,
   note: "",
 };
-// Global logic runs on every channel. A channel can get its own variant; until then it uses Global.
+// Global logic runs on every channel. A channel can get its own variant, which changes the logic for that channel only.
 const CHANNELS = [
   { id: "global", label: "Global", icon: "globe", hint: "Every channel", note: "" },
-  { id: "chat", label: "Chat", icon: "chat", hint: "Uses Global", note: "A chat variant could add quick-reply buttons for common answers." },
-  { id: "email", label: "Email", icon: "mail", hint: "Uses Global", note: "An email variant could add a greeting and sign-off, and answer every question in one reply." },
-  { id: "assist", label: "Agent Assist", icon: "person", hint: "Uses Global", note: "An Agent Assist variant would suggest replies to a Bookly employee instead of answering the customer." },
-  { id: "voice", label: "Voice", icon: "phone", hint: "Uses Global", note: "A voice variant could keep replies short and read order numbers back digit by digit." },
+  { id: "chat", label: "Chat", icon: "chat", hint: "", note: "A chat variant could add quick-reply buttons for common answers." },
+  { id: "email", label: "Email", icon: "mail", hint: "", note: "An email variant could add a greeting and sign-off, and answer every question in one reply." },
+  { id: "assist", label: "Agent Assist", icon: "person", hint: "", note: "An Agent Assist variant would suggest replies to a Bookly employee instead of answering the customer." },
+  { id: "voice", label: "Voice", icon: "phone", hint: "", note: "A voice variant could keep replies short and read order numbers back digit by digit." },
 ];
 
 export function AopDetailPage({ name, suggestion }: { name: string; suggestion?: string }) {
@@ -258,7 +258,7 @@ export function AopDetailPage({ name, suggestion }: { name: string; suggestion?:
                           setChannel(c.id);
                           setChannelOpen(false);
                         }}>
-                        <Icon name={c.icon} />{c.label}<span className="hint">{c.hint}</span>
+                        <Icon name={c.icon} />{c.label}{c.hint ? <span className="hint">{c.hint}</span> : <span className="hint change">Change AOP logic <Icon name="chevron" size={12} /></span>}
                       </button>
                     ))}
                     <hr />
@@ -277,7 +277,7 @@ export function AopDetailPage({ name, suggestion }: { name: string; suggestion?:
             </div>
             {current.id !== "global" && (
               <div className="notice" style={{ marginBottom: 12 }}>
-                <b>{current.label}</b> uses the Global logic below, since it has no variant of its own. {current.note}
+                <b>{current.label}</b>: a variant changes the AOP logic for {current.label === "Agent Assist" ? "Agent Assist" : current.label.toLowerCase()} only, and every other channel keeps Global. {current.note}
               </div>
             )}
             <div onFocus={() => setEditing(true)} onBlur={() => setEditing(false)}>
