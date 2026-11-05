@@ -37,7 +37,7 @@ const NAV: Item[] = [
   },
   { id: "qa", label: "QA", icon: "qa", children: [] },
   { id: "versioning", label: "Versioning", icon: "versioning", href: "#/versioning" },
-  { id: "test", label: "Test", icon: "test", children: [{ id: "sets", label: "Test sets", href: "#/test/sets" }] },
+  { id: "test", label: "Test", icon: "test", children: [{ id: "library", label: "Test library", href: "#/test/library" }, { id: "sets", label: "Test sets", href: "#/test/sets" }] },
   { id: "preview", label: "Preview", icon: "preview", href: "#/preview" },
   { id: "settings", label: "Settings", icon: "settings", children: [] },
 ];

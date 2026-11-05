@@ -13,6 +13,7 @@ import { HomePage } from "./pages/Home";
 import { InsightsPage } from "./pages/Insights";
 import { LoginPage } from "./pages/Login";
 import { PreviewPage } from "./pages/Preview";
+import { TestLibraryPage } from "./pages/TestLibrary";
 import { TestSetsPage } from "./pages/TestSets";
 import { ToolsPage } from "./pages/Tools";
 import { VersioningPage } from "./pages/Versioning";
@@ -51,6 +52,7 @@ export default function App() {
 function Page({ section, page, id, query }: { section: string; page: string; id?: string; query: URLSearchParams }) {
   if (section === "home") return <HomePage />;
   if (section === "autopilot") return <AutopilotPage />;
+  if (section === "test" && page !== "sets") return <TestLibraryPage />;
   if (section === "test") return <TestSetsPage key={id ?? ""} name={page === "sets" ? id : undefined} />;
   if (section === "build" && page === "aops") {
     const from = query.get("from") ?? undefined;
