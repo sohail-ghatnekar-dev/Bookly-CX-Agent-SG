@@ -45,12 +45,19 @@ insert into policy_docs (id, title, body) values
   ('HELP-1', 'Support hours', 'A Bookly employee replies within 1 business day, Monday to Friday.');
 
 insert into procedures (name, version, is_active, is_redteam, created_at, body) values
-('order_status', 1, true, false, now() - interval '30 days', $$Goal: tell the customer where their order is.
+('order_status', 1, false, false, now() - interval '30 days', $$Goal: tell the customer where their order is.
 1. Verify identity first: you need the order number and the email on that order. Ask for what's missing. Never reveal anything about an order before @verify_customer succeeds.
 2. If verification fails, say you couldn't match those details and ask them to check. Don't say which part was wrong. After two failures, offer to send the chat to a Bookly employee.
 3. After verifying, call @get_order_status for that order. If they ask about a different order, or about their orders in general, call @list_orders. If more than one is open and they haven't said which, list them by title and ask which one. Don't guess.
 4. Report status, carrier, tracking number, and estimated delivery in plain language.
 5. If the order is shipped and past its estimated delivery, say so plainly and offer to send the chat to a Bookly employee.$$),
+
+('order_status', 2, true, false, now() - interval '2 days', $$Goal: tell the customer where their order is.
+1. Verify identity first: you need the order number and the email on that order. Ask for what's missing. Never reveal anything about an order before @verify_customer succeeds.
+2. If verification fails, say you couldn't match those details and ask them to check. Don't say which part was wrong. After two failures, offer to send the chat to a Bookly employee.
+3. After verifying, call @get_order_status for that order. If they ask about a different order, or about their orders in general, call @list_orders. If more than one is open and they haven't said which, list them by title and ask which one. Don't guess.
+4. Report status, carrier, tracking number, and estimated delivery in plain language.
+5. If the order is shipped and past its estimated delivery and another procedure is for late orders, switch to it straight away, before you reply, and follow it. Don't ask the customer first or mention it. Only if there isn't one, say the order is late and offer to send the chat to a Bookly employee.$$),
 
 ('returns', 2, false, false, now() - interval '30 days', $$Goal: help the customer return an item, only when policy allows.
 1. Verify identity first with @verify_customer: the order number and the email on that order. Same rules as #order_status.

@@ -216,6 +216,9 @@ const HANDLERS: Record<string, (ctx: ToolContext, input: Input) => Promise<Resul
     const o = order.row;
     const today = new Date().toISOString().slice(0, 10);
     const late = o.status === "shipped" && !!o.estimated_delivery && o.estimated_delivery < today;
+    // A late order belongs with a late-orders AOP when one is on offer. Said here, where the model decides what to do
+    // next, and only when there is one, so it never mentions a procedure that doesn't exist.
+    const lateAop = late ? ctx.procedures?.find((n) => n !== ctx.conv.current_procedure && /(^|_)late(_|$)/.test(n)) : undefined;
     return ok({
       order: o.order_number,
       status: o.status,
@@ -225,6 +228,7 @@ const HANDLERS: Record<string, (ctx: ToolContext, input: Input) => Promise<Resul
       delivered: o.delivered_at?.slice(0, 10) ?? null,
       late,
       items: o.order_items.map((i) => ({ line: i.line_code, title: i.title, format: i.format })),
+      ...(lateAop && { next: `This order is late, and ${lateAop} is the procedure for late orders. Call select_procedure with ${lateAop} now, before replying, without asking the customer.` }),
     }, { kind: "tool", label: "get_order_status", detail: `${o.order_number} ${o.status}${late ? " late" : ""}`, outcome: "ok" });
   },
 
@@ -306,7 +310,7 @@ const HANDLERS: Record<string, (ctx: ToolContext, input: Input) => Promise<Resul
       .eq("order_number", order.row.order_number).gt("send_at", new Date().toISOString()).limit(1).maybeSingle();
     if (pending) {
       return ok(
-        { ok: true, already_scheduled: true, channel: "email", to, send_at: pending.send_at },
+        { ok: true, already_scheduled: true, channel: "email", to, send_at: pending.send_at, send_at_text: easternText(new Date(pending.send_at)) },
         { kind: "tool", label, detail: `${order.row.order_number} already scheduled`, outcome: "ok" },
       );
     }
@@ -318,9 +322,8 @@ const HANDLERS: Record<string, (ctx: ToolContext, input: Input) => Promise<Resul
       note: String(input.note ?? "").trim().slice(0, 200),
     });
     if (error) throw error;
-    const day = sendAt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/New_York" });
     return ok(
-      { ok: true, channel: "email", to, send_at: sendAt.toISOString(), send_at_text: `${day} at 9:00 AM Eastern` },
+      { ok: true, channel: "email", to, send_at: sendAt.toISOString(), send_at_text: easternText(sendAt) },
       { kind: "tool", label, detail: `${order.row.order_number} email ${sendAt.toISOString().slice(0, 10)}`, outcome: "ok" },
     );
   },
@@ -362,6 +365,13 @@ const HANDLERS: Record<string, (ctx: ToolContext, input: Input) => Promise<Resul
 };
 
 // --- helpers ---
+
+// "Friday, November 6 at 9:00 AM Eastern": how a follow-up's send time is said to the customer.
+function easternText(at: Date): string {
+  const day = at.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/New_York" });
+  const time = at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
+  return `${day} at ${time} Eastern`;
+}
 
 // "daniel.okafor@example.com" → "d•••@example.com", so a reply never spells out the full address.
 function maskEmail(email: string): string {
