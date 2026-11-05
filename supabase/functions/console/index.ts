@@ -72,6 +72,7 @@ const ACTIONS: Record<string, Action> = {
     for (const r of runs ?? []) latest.has(`${r.procedure}:${r.version}`) || latest.set(`${r.procedure}:${r.version}`, r.id);
     const { data: latestEval } = await db.from("eval_runs").select("model, total, passed, resolved, escalated, ran_at")
       .order("ran_at", { ascending: false }).limit(1).maybeSingle();
+    const { data: customTools } = await db.from("custom_tools").select("*").order("created_at", { ascending: false });
     const tried = new Set<string>();
     for (const v of versions.filter((v) => !v.published_at)) {
       if (await triedOnPhone(v.name, v.version, v.created_at)) tried.add(`${v.name}:${v.version}`);
@@ -82,7 +83,13 @@ const ACTIONS: Record<string, Action> = {
         latest_run: latest.get(`${v.name}:${v.version}`) ?? null,
         tried_in_preview: tried.has(`${v.name}:${v.version}`),
       })),
-      tools: TOOL_DEFS.map((t) => ({ name: t.name, description: t.description, always_on: ALWAYS_ON.includes(t.name) })),
+      tools: TOOL_DEFS.map((t) => ({
+        name: t.name,
+        description: t.description,
+        always_on: ALWAYS_ON.includes(t.name),
+        input_schema: t.input_schema,
+      })),
+      custom_tools: customTools ?? [],
       latest_eval: latestEval,
       metadata: METADATA,
       scenarios: SCENARIOS.map((s) => ({
@@ -131,6 +138,36 @@ const ACTIONS: Record<string, Action> = {
     }
     await audit(name, version, "draft_saved", user, fields.note);
     return { name, version };
+  },
+
+  // A new tool, as a request to engineering: what it does, how it's reached, and what it takes. It can't be called,
+  // or referenced in an AOP, until it's built and deployed.
+  async create_tool(user, input) {
+    const name = String(input.name ?? "").trim();
+    const description = String(input.description ?? "").trim();
+    const type = String(input.type ?? "");
+    if (!AOP_NAME.test(name)) throw new Refusal("Use 3-40 lowercase letters, digits or underscores for the tool's name.");
+    if (TOOL_DEFS.some((t) => t.name === name)) throw new Refusal(`There's already a tool called ${name}.`);
+    if (!description || description.length > 500) throw new Refusal("Describe what the tool does, in up to 500 characters.");
+    if (!["coded", "api", "integration"].includes(type)) throw new Refusal("Pick a tool type.");
+    const method = type === "api" ? String(input.method ?? "GET") : null;
+    const url = type === "api" ? String(input.url ?? "").trim() : null;
+    if (type === "api" && (!/^https:\/\/\S+$/.test(url ?? "") || !["GET", "POST", "PUT", "PATCH", "DELETE"].includes(method!))) {
+      throw new Refusal("An API tool needs a method and an https:// endpoint.");
+    }
+    const raw = Array.isArray(input.inputs) ? input.inputs.slice(0, 10) : [];
+    const inputs = raw.map((i: Record<string, unknown>) => ({
+      name: String(i.name ?? "").trim(),
+      type: ["string", "number", "boolean"].includes(String(i.type)) ? String(i.type) : "string",
+      required: i.required === true,
+      description: String(i.description ?? "").trim().slice(0, 200),
+    })).filter((i) => /^[a-z][a-z0-9_]{0,39}$/.test(i.name));
+    const guardrails = String(input.guardrails ?? "").trim().slice(0, 500);
+    const { data, error } = await db.from("custom_tools")
+      .insert({ name, description, type, method, url, inputs, guardrails, created_by: user.email ?? user.id }).select("*").single();
+    if (error?.code === "23505") throw new Refusal(`There's already a tool called ${name}.`);
+    if (error) throw error;
+    return { tool: data };
   },
 
   // Throws away the open draft. Published versions are never deleted.

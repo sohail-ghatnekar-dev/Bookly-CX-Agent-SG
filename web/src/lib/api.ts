@@ -21,6 +21,21 @@ export interface Tool {
   name: string;
   description: string;
   always_on: boolean;
+  input_schema?: { properties?: Record<string, { type?: string; description?: string; enum?: string[] }>; required?: string[] };
+}
+
+// A tool added from Build › Tools: a request to engineering, not callable until it's built and deployed.
+export interface CustomTool {
+  id: string;
+  name: string;
+  description: string;
+  type: "coded" | "api" | "integration";
+  method: string | null;
+  url: string | null;
+  inputs: { name: string; type: string; required: boolean; description: string }[];
+  guardrails: string;
+  created_by: string;
+  created_at: string;
 }
 
 // The fields an AOP version is saved with. Its tools are the ones the body references with @.
@@ -52,6 +67,7 @@ export interface Overview {
   scenarios: Scenario[];
   latest_eval: { model: string; total: number; passed: number; resolved: number; escalated: number; ran_at: string } | null;
   metadata: { key: string; description: string }[];
+  custom_tools: CustomTool[];
 }
 
 export interface SimResult {
@@ -214,6 +230,8 @@ export const api = {
   overview: () => consoleCall<Overview>("overview"),
   createAop: (draft: AopDraft) => consoleCall<{ name: string; version: number }>("create_aop", { ...draft }),
   saveDraft: (draft: AopDraft) => consoleCall<{ name: string; version: number }>("save_draft", { ...draft }),
+  createTool: (tool: Omit<CustomTool, "id" | "created_by" | "created_at" | "method" | "url"> & { method?: string; url?: string }) =>
+    consoleCall<{ tool: CustomTool }>("create_tool", { ...tool }),
   discardDraft: (name: string, version: number) => consoleCall<{ name: string }>("discard_draft", { name, version }),
   retire: (name: string) => consoleCall<{ version: number }>("retire", { name }),
   chat: (message: string, conversationId: string | null, testing?: { name: string; version: number }) =>

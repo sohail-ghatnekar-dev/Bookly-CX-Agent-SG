@@ -212,6 +212,18 @@ table.log { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 /* Tools */
 .tool-row-guard { color: var(--muted); font-size: 13px; }
 .chip-ref { padding: 1px 6px; text-decoration: none; white-space: nowrap; }
+.status-pill { display: inline-block; font-size: 12.5px; font-weight: 500; border-radius: 999px; padding: 2px 10px; }
+.status-pill.used { background: var(--ok-soft); color: var(--ok); }
+.status-pill.unused { background: var(--bad-soft); color: var(--bad); }
+.type-pill { display: inline-block; font-size: 12.5px; border-radius: 999px; padding: 2px 10px; background: #f1eefe; color: #7a5bd6; }
+.kebab { width: 30px; height: 30px; border-radius: 50%; border: 0; background: #f3f3f6; color: var(--muted); font-size: 16px; line-height: 1; }
+.kebab:hover { background: #e8e8ee; color: var(--ink); }
+.tools-table td { padding-top: 12px; padding-bottom: 12px; }
+.form { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
+.field-row { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500; }
+.field-row > span { color: var(--muted); }
+.inputs-list { display: flex; flex-direction: column; gap: 8px; font-weight: 400; }
+.input-row { display: grid; grid-template-columns: 150px 100px auto minmax(0, 1fr) 30px; gap: 8px; align-items: center; }
 
 /* Preview */
 .preview-card { display: flex; flex-direction: column; gap: 14px; }
