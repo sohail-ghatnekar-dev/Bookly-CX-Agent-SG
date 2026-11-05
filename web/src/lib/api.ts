@@ -182,6 +182,8 @@ export interface Watchtower {
   category: string;
   rubric: string;
   count: number;
+  analyzed: number;
+  daily: { date: string; passed: number; flagged: number }[];
   conversations: {
     id: string;
     created_at: string;

@@ -327,3 +327,57 @@ export function HourlyBars({ counts }: { counts: number[] }) {
     </div>
   );
 }
+
+// Two-part daily bars: conversations a watchtower passed (green) with the flagged ones (red) stacked on top.
+export function StackedBars({ days, height = 260 }: { days: { date: string; passed: number; flagged: number }[]; height?: number }) {
+  const { ref, width } = useWidth<HTMLDivElement>();
+  const [hover, setHover] = useState<number | null>(null);
+  const pad = { left: 56, right: 12, top: 10, bottom: 26 };
+  const w = Math.max(width, 300);
+  const top = niceMax(Math.max(1, ...days.map((d) => d.passed + d.flagged)));
+  const slot = (w - pad.left - pad.right) / Math.max(days.length, 1);
+  const y = (v: number) => pad.top + (1 - v / top) * (height - pad.top - pad.bottom);
+  const label = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
+  const PASS = "#4cc463";
+  const FLAG = "#e5483b";
+
+  return (
+    <div className="chart" ref={ref}>
+      <svg width={w} height={height} role="img" aria-label="Conversations passed and flagged by day" onMouseLeave={() => setHover(null)}>
+        <text transform={`translate(14 ${height / 2}) rotate(-90)`} textAnchor="middle" className="axis">Number of conversations</text>
+        {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+          <g key={f}>
+            <line x1={pad.left} x2={w - pad.right} y1={y(f * top)} y2={y(f * top)} className="grid" />
+            <text x={pad.left - 8} y={y(f * top)} className="axis" textAnchor="end" dominantBaseline="middle">{Math.round(f * top)}</text>
+          </g>
+        ))}
+        {days.map((d, i) => {
+          const bx = pad.left + i * slot + slot * 0.16;
+          const bw = slot * 0.68;
+          const total = d.passed + d.flagged;
+          return (
+            <g key={d.date} onMouseEnter={() => setHover(i)} opacity={hover === null || hover === i ? 1 : 0.55}>
+              <rect x={pad.left + i * slot} y={pad.top} width={slot} height={height - pad.top - pad.bottom} fill="transparent" />
+              {d.passed > 0 && <rect x={bx} y={y(d.passed)} width={bw} height={y(0) - y(d.passed)} fill={PASS} />}
+              {d.flagged > 0 && <rect x={bx} y={y(total)} width={bw} height={Math.max(1, y(d.passed) - y(total) - (d.passed ? 1.5 : 0))} fill={FLAG} />}
+            </g>
+          );
+        })}
+        {days.map((d, i) => (i % 3 === 0 || i === days.length - 1) && (
+          <text key={d.date} x={pad.left + i * slot + slot / 2} y={height - 8} className="axis" textAnchor="middle">{label(d.date)}</text>
+        ))}
+      </svg>
+      <div className="legend center">
+        <span><i style={{ background: PASS }} />Passed</span>
+        <span><i style={{ background: FLAG }} />Flagged</span>
+      </div>
+      {hover !== null && (
+        <div className="tip" style={{ left: Math.min(pad.left + hover * slot + slot, w - 170), top: 8 }}>
+          <div className="tip-title">{new Date(`${days[hover].date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</div>
+          <div className="tip-row"><i style={{ background: PASS }} />Passed<b>{days[hover].passed}</b></div>
+          <div className="tip-row"><i style={{ background: FLAG }} />Flagged<b>{days[hover].flagged}</b></div>
+        </div>
+      )}
+    </div>
+  );
+}

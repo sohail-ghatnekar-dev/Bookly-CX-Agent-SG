@@ -104,3 +104,12 @@ Deno.test("hourly volume is in Pacific time; messages per chat cap at 10+; cited
   assertEquals([s.messages_per_chat[1], s.messages_per_chat[9]], [1, 1]);
   assertEquals(s.articles.map((a) => [a.key, a.count]), [["SHIP-2", 2], ["PAY-1", 1]]);
 });
+
+Deno.test("each watchtower reports what it analyzed and a daily passed/flagged split", () => {
+  const now = Date.parse("2026-10-20T18:00:00Z");
+  const rated = (csat: number) => chat({ created_at: "2026-10-20T09:00:00Z", csat });
+  const s = summarize([rated(5), rated(1), chat({ created_at: "2026-10-20T10:00:00Z" })], 2, now);
+  const unhappy = s.watchtowers.find((w) => w.key === "unhappy")!;
+  assertEquals([unhappy.count, unhappy.analyzed], [1, 2]);
+  assertEquals(unhappy.daily, [{ date: "2026-10-19", passed: 0, flagged: 0 }, { date: "2026-10-20", passed: 1, flagged: 1 }]);
+});

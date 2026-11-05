@@ -2,16 +2,19 @@
 // Live AOPs by default, or one draft in place of its live version. Chat only in this demo.
 import { useEffect, useState } from "react";
 import { ChatLab } from "../components/ChatLab";
+import { EmailPreview, VoicePreview } from "../components/ChannelPreviews";
 import { Info } from "../components/Info";
 import { TestCustomers } from "../components/TestCustomers";
 import { api, type Version } from "../lib/api";
 import { aopTitle } from "../lib/format";
 import { go } from "../lib/router";
 
-const CHANNELS = ["Chat", "Email", "Voice", "Decagon Assist"];
+const CHANNELS = ["Chat", "Email", "Voice", "Decagon Assist"] as const;
+type Channel = (typeof CHANNELS)[number];
 
 export function PreviewPage({ testing }: { testing?: { name: string; version: number } }) {
   const [drafts, setDrafts] = useState<Version[]>([]);
+  const [channel, setChannel] = useState<Channel>("Chat");
 
   useEffect(() => {
     api.overview().then((o) => setDrafts(o.versions.filter((v) => !v.published_at))).catch(() => {});
@@ -28,10 +31,13 @@ export function PreviewPage({ testing }: { testing?: { name: string; version: nu
       </div>
       <div className="tabs" role="tablist">
         {CHANNELS.map((c) => (
-          <button key={c} role="tab" className={`tab${c === "Chat" ? " active" : ""}`} aria-selected={c === "Chat"} disabled={c !== "Chat"} title={c === "Chat" ? undefined : "Not part of this demo"}>{c}</button>
+          <button key={c} role="tab" className={`tab${c === channel ? " active" : ""}`} aria-selected={c === channel}
+            disabled={c === "Decagon Assist"} title={c === "Decagon Assist" ? "Not part of this demo" : undefined} onClick={() => setChannel(c)}>{c}</button>
         ))}
       </div>
-      <div className="card preview-card">
+      {channel === "Voice" && <VoicePreview />}
+      {channel === "Email" && <EmailPreview />}
+      <div className="card preview-card" hidden={channel !== "Chat"}>
         <div className="card-head" style={{ marginBottom: 0 }}>
           <h2>Test chat</h2>
           <span className={`pill ${testing ? "draft" : "ok"}`}>{label}</span>
@@ -56,7 +62,7 @@ export function PreviewPage({ testing }: { testing?: { name: string; version: nu
         </div>
         <ChatLab testing={testing} />
       </div>
-      <TestCustomers />
+      {channel === "Chat" && <TestCustomers />}
     </div>
   );
 }

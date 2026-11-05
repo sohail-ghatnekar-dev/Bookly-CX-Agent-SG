@@ -46,6 +46,8 @@ export interface Summary {
     category: string;
     rubric: string;
     count: number;
+    analyzed: number; // conversations the rubric applies to
+    daily: { date: string; passed: number; flagged: number }[];
     conversations: Brief[];
   }[];
 }
@@ -99,6 +101,7 @@ const WATCHTOWERS: {
   name: string;
   category: string;
   rubric: string;
+  scope: (c: ConversationRow) => boolean; // which conversations the rubric is checked against
   match: (c: ConversationRow, repeat: Set<string>) => boolean;
 }[] = [
   {
@@ -106,6 +109,7 @@ const WATCHTOWERS: {
     name: "Customer didn't get their return",
     category: "Returns",
     rubric: "Eligible for a return, or told one was started, but no RMA was ever issued.",
+    scope: (c) => c.trace_events.some((e) => (e.label === "eligibility" && e.outcome === "ok") || e.label === "unsupported_claim"),
     match: (c) =>
       c.trace_events.some((e) => (e.label === "eligibility" && e.outcome === "ok") || e.label === "unsupported_claim") &&
       !c.trace_events.some((e) => e.label === "initiate_return" && e.outcome === "ok"),
@@ -115,6 +119,7 @@ const WATCHTOWERS: {
     name: "Order arriving late",
     category: "Orders",
     rubric: "The customer's order is shipped but past its estimated delivery date.",
+    scope: (c) => c.trace_events.some((e) => e.label === "get_order_status"),
     match: (c) => c.trace_events.some((e) => e.label === "get_order_status" && /\blate\b/.test(e.detail)),
   },
   {
@@ -122,6 +127,7 @@ const WATCHTOWERS: {
     name: "Pushed back on a return decision",
     category: "Returns",
     rubric: "A return was denied by policy and the customer insisted until an employee took over.",
+    scope: (c) => c.trace_events.some((e) => e.label === "eligibility" && e.outcome === "denied"),
     match: (c) => c.status === "escalated" && c.trace_events.some((e) => e.label === "eligibility" && e.outcome === "denied"),
   },
   {
@@ -129,6 +135,7 @@ const WATCHTOWERS: {
     name: "Came back within 7 days",
     category: "Experience",
     rubric: "The same verified customer wrote in about the same thing again within a week, so the first chat may not have solved it.",
+    scope: (c) => !!c.verified_customer_id,
     match: (c, repeat) => repeat.has(c.id),
   },
   {
@@ -136,6 +143,7 @@ const WATCHTOWERS: {
     name: "Stuck on verification",
     category: "Experience",
     rubric: "Two or more wrong order number and email attempts, or locked out.",
+    scope: (c) => c.trace_events.some((e) => e.label === "verify_customer" || e.label === "lockout"),
     match: (c) =>
       c.trace_events.filter((e) => e.label === "verify_customer" && e.outcome === "denied").length >= 2 ||
       c.trace_events.some((e) => e.label === "lockout"),
@@ -145,6 +153,7 @@ const WATCHTOWERS: {
     name: "Unhappy customer",
     category: "Experience",
     rubric: "Rated the chat 1 or 2 out of 5.",
+    scope: (c) => !!c.csat,
     match: (c) => !!c.csat && c.csat <= 2,
   },
   {
@@ -152,6 +161,7 @@ const WATCHTOWERS: {
     name: "Needs review",
     category: "Quality",
     rubric: "Made-up policy citations, return claims with no RMA, refusals or step limits.",
+    scope: () => true,
     match: (c) => c.trace_events.some((e) => e.kind === "guard" && FLAGGED.has(e.label)),
   },
 ];
@@ -293,9 +303,16 @@ export function summarize(rows: ConversationRow[], days: number, now = Date.now(
       events.filter((e) => e.label === "sources" && e.outcome === "ok").flatMap((e) => e.detail.split(/,\s*/)).filter(Boolean),
       (k) => k,
     ),
-    watchtowers: WATCHTOWERS.map(({ match, ...w }) => {
+    watchtowers: WATCHTOWERS.map(({ match, scope, ...w }) => {
       const hits = newestFirst.filter((c) => match(c, repeat));
-      return { ...w, count: hits.length, conversations: hits.slice(0, MAX_LISTED).map(brief) };
+      const scoped = chats.filter((c) => scope(c) || match(c, repeat));
+      const hitIds = new Set(hits.map((c) => c.id));
+      const daily = byDay([], days, now).map(({ date }) => {
+        const today = scoped.filter((c) => c.created_at.slice(0, 10) === date);
+        const flagged = today.filter((c) => hitIds.has(c.id)).length;
+        return { date, passed: today.length - flagged, flagged };
+      });
+      return { ...w, count: hits.length, analyzed: scoped.length, daily, conversations: hits.slice(0, MAX_LISTED).map(brief) };
     }),
   };
 }

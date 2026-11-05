@@ -1,15 +1,21 @@
-// Analyze › Watchtowers: the lower-level view. Each watchtower checks every live conversation against a rubric for one
-// thing going wrong, like a customer who didn't get their return, and lists the ones it caught, down to every step.
+// Analyze › Watchtowers: the lower-level view. Each watchtower checks every live conversation in its scope against a
+// rubric for one thing going wrong, like a customer who didn't get their return, and lists the ones it flagged.
 import { useEffect, useState } from "react";
+import { StackedBars } from "../components/Charts";
 import { ConversationLog } from "../components/ConversationLog";
+import { Icon } from "../components/Icon";
+import { Info } from "../components/Info";
 import { api, type WatchtowerSummary } from "../lib/api";
 import { ago } from "../lib/format";
+
+const longDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 export function WatchtowersPage({ initial }: { initial?: string }) {
   const [s, setS] = useState<WatchtowerSummary | null>(null);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<string | null>(initial ?? null);
   const [logId, setLogId] = useState<string | null>(null);
+  const [loadedAt] = useState(() => new Date());
 
   useEffect(() => {
     api.watchtower().then(setS).catch((e: Error) => setError(e.message));
@@ -18,32 +24,55 @@ export function WatchtowersPage({ initial }: { initial?: string }) {
   if (error) return <div className="empty error">{error}</div>;
   if (!s) return <div className="empty muted">Loading Watchtowers…</div>;
 
-  const tower = s.watchtowers.find((w) => w.key === selected) ?? s.watchtowers[0];
+  const tower = s.watchtowers.find((w) => w.key === selected) ?? s.watchtowers.find((w) => w.count > 0) ?? s.watchtowers[0];
+  const from = s.daily[0]?.date;
+  const to = s.daily.at(-1)?.date;
+  const rate = tower.analyzed ? (tower.count / tower.analyzed) * 100 : 0;
+  const lastRun = loadedAt.toLocaleString("en-US", { timeZone: "America/Los_Angeles", dateStyle: "short", timeStyle: "medium" });
 
   return (
     <div className="page">
       <div className="page-head">
         <h1>Watchtowers</h1>
-        <span className="sub">Every one of {s.conversations.toLocaleString()} live chats checked, not a sample · last {s.days} days</span>
+        <Info text="Each watchtower checks every live conversation in its scope against a rubric, not a sample, and flags the ones that fail it." />
+        {from && to && (
+          <span className="date-pill"><Icon name="calendar" size={14} />{longDate(`${from}T12:00:00Z`)} – {longDate(`${to}T12:00:00Z`)}</span>
+        )}
+        <span className="spacer" />
+        <button className="secondary" disabled title="Creating watchtowers isn't part of this demo"><Icon name="plus" size={14} />Create watchtower<Icon name="down" size={14} /></button>
       </div>
-      <div className="towers">
-        {s.watchtowers.map((w) => (
-          <button key={w.key} className={`tower${w.key === tower.key ? " active" : ""}`} onClick={() => setSelected(w.key)} aria-pressed={w.key === tower.key}>
-            <span className="tag" style={{ alignSelf: "flex-start" }}>{w.category}</span>
-            <div className="tower-top">
-              <b>{w.name}</b>
-              <span className={`tower-count${w.count ? "" : " zero"}`}>{w.count}</span>
+
+      <div className="card wt-card">
+        <div className="wt-head">
+          <div>
+            <div className="row">
+              <h2 style={{ margin: 0 }}>{tower.name}</h2>
+              <Info text={tower.rubric} />
             </div>
-            <span className="muted small">{w.rubric}</span>
-          </button>
-        ))}
+            <div className="muted">Recurring · {tower.category}</div>
+          </div>
+          <span className="spacer" />
+          <select className="select" value={tower.key} onChange={(e) => setSelected(e.target.value)} aria-label="Watchtower">
+            {s.watchtowers.map((w) => <option key={w.key} value={w.key}>{w.name} ({w.count})</option>)}
+          </select>
+          <button className="ghost" disabled aria-label="More">⋯</button>
+        </div>
+        <span className="rubric-tag">Rubric</span>
+        <p className="muted small" style={{ margin: "8px 0 14px", maxWidth: 760 }}>Flag a conversation when: {tower.rubric}</p>
+        <div className="wt-tiles">
+          <div className="wt-tile"><span className="muted small">Conversations analyzed</span><b>{tower.analyzed.toLocaleString()}</b></div>
+          <div className="wt-tile"><span className="muted small">Flagged</span><b>{tower.count.toLocaleString()}</b></div>
+          <div className="wt-tile"><span className="muted small">Flagged rate</span><b>{rate.toFixed(2)}%</b></div>
+        </div>
+        <p className="muted small" style={{ margin: "12px 0 6px" }}>Last run: {lastRun} PT</p>
+        <StackedBars days={tower.daily} />
       </div>
 
       <div className="card table-card">
         <div className="card-head">
-          <h2>{tower.name}</h2>
+          <h2>Flagged conversations</h2>
           <span className="muted small">
-            {tower.count} conversation{tower.count === 1 ? "" : "s"}{tower.count > tower.conversations.length ? `, newest ${tower.conversations.length} shown` : ""}. Open one to see why the agent did what it did.
+            {tower.count} flagged{tower.count > tower.conversations.length ? `, newest ${tower.conversations.length} shown` : ""}. Open one to see why the agent did what it did.
           </span>
         </div>
         <table className="log">
@@ -60,7 +89,7 @@ export function WatchtowersPage({ initial }: { initial?: string }) {
                 <td className="mono">{c.csat ? `${c.csat}/5` : "–"}</td>
               </tr>
             ))}
-            {tower.conversations.length === 0 && <tr><td colSpan={7} className="muted">Nothing caught in the last {s.days} days.</td></tr>}
+            {tower.conversations.length === 0 && <tr><td colSpan={7} className="muted">Nothing flagged in the last {s.days} days.</td></tr>}
           </tbody>
         </table>
       </div>

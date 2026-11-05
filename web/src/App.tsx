@@ -7,6 +7,7 @@ import { useRoute } from "./lib/router";
 import { supabase } from "./lib/supabase";
 import { AopDetailPage } from "./pages/AopDetail";
 import { AopListPage } from "./pages/AopList";
+import { AutopilotPage } from "./pages/Autopilot";
 import { ConversationsPage } from "./pages/Conversations";
 import { HomePage } from "./pages/Home";
 import { InsightsPage } from "./pages/Insights";
@@ -49,6 +50,7 @@ export default function App() {
 
 function Page({ section, page, id, query }: { section: string; page: string; id?: string; query: URLSearchParams }) {
   if (section === "home") return <HomePage />;
+  if (section === "autopilot") return <AutopilotPage />;
   if (section === "test") return <TestSetsPage key={id ?? ""} name={page === "sets" ? id : undefined} />;
   if (section === "build" && page === "aops") {
     const from = query.get("from") ?? undefined;

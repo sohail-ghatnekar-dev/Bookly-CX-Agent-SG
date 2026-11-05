@@ -14,7 +14,7 @@ interface Item {
 
 const NAV: Item[] = [
   { id: "home", label: "Home", icon: "home", href: "#/home" },
-  { id: "autopilot", label: "Autopilot", icon: "autopilot" },
+  { id: "autopilot", label: "Autopilot", icon: "autopilot", href: "#/autopilot" },
   { id: "conversations", label: "Conversations", icon: "conversations", href: "#/conversations" },
   { id: "outbound", label: "Outbound", icon: "outbound" },
   {
