@@ -84,7 +84,9 @@ export function PhoneChat({ testing, onReply, onNewConversation }: {
     const el = box.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+    const full = el.scrollHeight + el.offsetHeight - el.clientHeight; // scrollHeight leaves out the border
+    el.style.height = `${Math.min(full, 132)}px`;
+    el.style.overflowY = full > 132 ? "auto" : "hidden";
   }, [draft]);
 
   function submit(e: React.FormEvent) {
