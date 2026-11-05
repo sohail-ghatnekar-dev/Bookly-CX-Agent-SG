@@ -1,6 +1,7 @@
 // Puts the demo orders back where supabase/seed.sql left them, counted from today, so return windows still line up:
 // Piranesi inside 30 days, The Overstory between 30 and 60, and so on. Also deletes returns started on the demo
-// orders, so the same book can be returned again. Conversations, escalations and logs are kept.
+// orders, so the same book can be returned again, and their follow-ups, so a late order can be scheduled again.
+// Conversations, escalations and logs are kept.
 // deno run -A scripts/reset-demo.ts [--remote] [--keep-returns] [--yes]
 // Uses SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from evals/.env (local) or evals/.env.remote (cloud).
 import { parseArgs } from "jsr:@std/cli@1/parse-args";
@@ -36,10 +37,14 @@ if (itemsError) fail(itemsError.message);
 // An item has at most one return, so this comes back as one row or null.
 const returned = items!.filter((i) => [i.returns].flat().some(Boolean));
 const clearing = !args["keep-returns"] && returned.length > 0;
+const { data: followUps, error: followUpsError } = await db.from("follow_ups").select("id, order_number")
+  .in("order_number", Object.keys(ORDERS));
+if (followUpsError) fail(followUpsError.message);
 
 console.log(`On ${env.SUPABASE_URL}:`);
 console.log(`- move ${Object.keys(ORDERS).length} demo orders' dates to count from today`);
 if (clearing) console.log(`- delete ${returned.length} return(s): ${returned.map((i) => i.title).join(", ")}`);
+if (followUps!.length) console.log(`- delete ${followUps!.length} follow-up(s): ${[...new Set(followUps!.map((f) => f.order_number))].join(", ")}`);
 if (args.remote && !args.yes && !confirm("Go ahead?")) Deno.exit(0);
 
 for (const [order, d] of Object.entries(ORDERS)) {
@@ -52,6 +57,10 @@ for (const [order, d] of Object.entries(ORDERS)) {
 }
 if (clearing) {
   const { error } = await db.from("returns").delete().in("order_item_id", returned.map((i) => i.id));
+  if (error) fail(error.message);
+}
+if (followUps!.length) {
+  const { error } = await db.from("follow_ups").delete().in("id", followUps!.map((f) => f.id));
   if (error) fail(error.message);
 }
 console.log("Done. Piranesi and Circe are 12 days past delivery, The Overstory 41, Parable of the Sower 70; BK-1072 is 3 days late.");
